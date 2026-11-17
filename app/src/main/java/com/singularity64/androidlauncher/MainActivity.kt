@@ -111,7 +111,6 @@ private fun appGroup(app:ResolveInfo,pm:android.content.pm.PackageManager):Strin
   listOf("camera","gallery","photos","foto","galerie").any { pkg.contains(it) || name.contains(it) } -> "Fotografie"
   listOf("chrome","firefox","browser","opera","edge").any { pkg.contains(it) || name.contains(it) } -> "Internet"
   else -> when(app.activityInfo.applicationInfo.category) {
-   android.content.pm.ApplicationInfo.CATEGORY_FINANCE -> "Bankovnictví a finance"
    android.content.pm.ApplicationInfo.CATEGORY_PRODUCTIVITY -> "Práce a produktivita"
    android.content.pm.ApplicationInfo.CATEGORY_SOCIAL -> "Sociální sítě"
    android.content.pm.ApplicationInfo.CATEGORY_VIDEO,android.content.pm.ApplicationInfo.CATEGORY_AUDIO -> "Zábava a média"
