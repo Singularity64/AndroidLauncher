@@ -9,7 +9,9 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
@@ -334,18 +336,31 @@ private data class HomeTileSpec(
  } }
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
- var horizontalSwipe by remember { mutableFloatStateOf(0f) }
  BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
   val screenHeightPx=with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
   LazyVerticalGrid(
    columns=GridCells.Fixed(4),
    modifier=Modifier.fillMaxSize().pointerInput(Unit) {
-    detectHorizontalDragGestures(
-     onDragStart={ horizontalSwipe=0f },
-     onHorizontalDrag={ change,amount -> horizontalSwipe+=amount; if(amount<0f) change.consume() },
-     onDragEnd={ if(horizontalSwipe < -75.dp.toPx()) onApps(); horizontalSwipe=0f },
-     onDragCancel={ horizontalSwipe=0f }
-    )
+    // Observe at Initial pass so child tiles cannot swallow the drawer gesture.
+    awaitEachGesture {
+     val down=awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
+     val start=down.position
+     var last=start
+     var finished=false
+     while(!finished) {
+      val event=awaitPointerEvent(PointerEventPass.Initial)
+      val pointer=event.changes.firstOrNull { it.id==down.id }
+      if(pointer==null) {
+       finished=true
+      } else {
+       last=pointer.position
+       if(!pointer.pressed) finished=true
+      }
+     }
+     val dx=last.x-start.x
+     val dy=last.y-start.y
+     if(dx < -75.dp.toPx() && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.25f) onApps()
+    }
    }.pointerInput(screenHeightPx) {
     detectVerticalDragGestures(
      onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f },
