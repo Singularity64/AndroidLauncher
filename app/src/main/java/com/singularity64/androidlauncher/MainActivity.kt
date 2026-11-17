@@ -272,10 +272,18 @@ class MainActivity : ComponentActivity() {
       val rankedApps=filtered.sortedWith(compareByDescending<ResolveInfo> {
        (scores[it.activityInfo.packageName]?:0.0)+ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5
       }.thenBy { it.loadLabel(packageManager).toString() })
-      val grouped=rankedApps.groupBy { appGroup(it,packageManager) }.toList()
-       .sortedWith(compareByDescending<Pair<String,List<ResolveInfo>>> { group ->
-        group.second.sumOf { (scores[it.activityInfo.packageName]?:0.0)+ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
-       }.thenBy { it.first })
+      // Smart mode: rank apps within each category and rank categories by actual usage.
+      // A single heavily used app should make its category easy to find.
+      fun appUsageRank(app:ResolveInfo):Double {
+       val pkg=app.activityInfo.packageName
+       return (scores[pkg]?:0.0)+ln(1.0+prefs.getInt("count_${pkg}",0))*1.5
+      }
+      val grouped=rankedApps.groupBy { appGroup(it,packageManager) }.map { (category,groupApps) ->
+       category to groupApps.sortedWith(compareByDescending<ResolveInfo> { appUsageRank(it) }
+        .thenBy { it.loadLabel(packageManager).toString().lowercase(Locale.getDefault()) })
+      }.sortedWith(compareByDescending<Pair<String,List<ResolveInfo>>> { group ->
+       group.second.maxOfOrNull { appUsageRank(it) } ?: 0.0
+      }.thenByDescending { group -> group.second.sumOf { appUsageRank(it) } }.thenBy { it.first })
       LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp),
        contentPadding=PaddingValues(bottom=20.dp)) {
        if(!smartMode) {
