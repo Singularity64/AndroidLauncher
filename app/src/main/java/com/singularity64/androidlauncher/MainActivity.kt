@@ -454,6 +454,9 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    addAll(tiles.map { it.id }.filter { it !in this })
   }
  }
+ val cellPositions=remember(tiles) { mutableStateMapOf<String,Int>().apply {
+  tiles.forEach { tile -> if(prefs.contains("cell_"+tile.id)) put(tile.id,prefs.getInt("cell_"+tile.id,0)) }
+ } }
  val orderedTiles=orderedIds.mapNotNull { id -> tiles.firstOrNull { it.id==id } }
  val tileBounds=remember { mutableStateMapOf<String,Rect>() }
  var draggingTile by remember { mutableStateOf<String?>(null) }
@@ -474,6 +477,33 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val heights=remember { mutableStateMapOf<String,Int>().apply {
   tiles.forEach { put(it.id,prefs.getInt("height_"+it.id,it.defaultHeight)) }
  } }
+ // Place tiles in four columns; gaps inside rows are preserved, empty whole rows removed.
+ fun buildCells():List<Pair<HomeTileSpec?,Int>> {
+  val occupied=mutableMapOf<Int,HomeTileSpec>()
+  val result=mutableMapOf<Int,Pair<HomeTileSpec?,Int>>()
+  val ordered=orderedTiles.sortedWith(compareBy<HomeTileSpec> { cellPositions[it.id]?:Int.MAX_VALUE }.thenBy { orderedIds.indexOf(it.id) })
+  ordered.forEach { tile ->
+   val width=(sizes[tile.id]?:tile.defaultSpan).coerceIn(1,4)
+   var start=(cellPositions[tile.id]?:0).coerceAtLeast(0)
+   if(!cellPositions.containsKey(tile.id)) start=(occupied.keys.maxOrNull()?.plus(1)?:0)
+   while(start%4+width>4 || (0 until width).any { occupied.containsKey(start+it) }) start++
+   for(i in 0 until width) occupied[start+i]=tile
+   result[start]=tile to width
+  }
+  val usedRows=occupied.keys.map { it/4 }.distinct().sorted()
+  val cells=mutableListOf<Pair<HomeTileSpec?,Int>>()
+  usedRows.forEach { row ->
+   var col=0
+   while(col<4) {
+    val index=row*4+col
+    val entry=result[index]
+    if(entry!=null) { cells.add(entry);col+=entry.second }
+    else { cells.add(null to 1);col++ }
+   }
+  }
+  return cells
+ }
+ val gridCells=buildCells()
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
  BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -512,8 +542,10 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    horizontalArrangement=Arrangement.spacedBy(10.dp),
    verticalArrangement=Arrangement.spacedBy(10.dp)
   ) {
-   gridItems(orderedTiles,span={ tile -> androidx.compose.foundation.lazy.grid.GridItemSpan(sizes[tile.id]?:tile.defaultSpan) },key={it.id}) { tile ->
-    val span=sizes[tile.id]?:tile.defaultSpan
+   gridItems(gridCells,span={ entry -> androidx.compose.foundation.lazy.grid.GridItemSpan(entry.second) }) { entry ->
+    val tile=entry.first
+    if(tile==null) { Spacer(Modifier.fillMaxWidth().height(1.dp)) } else {
+    val span=entry.second
     val height=(heights[tile.id]?:tile.defaultHeight).coerceAtLeast(if(hideLabels) 82 else 108)
     val smallSide=(maxWidth-20.dp-30.dp)/4
     val tileHeight=when(span) { 1 -> smallSide; 2 -> smallSide*2+10.dp; else -> height.dp }
@@ -539,13 +571,28 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
         if(origin!=null && dragDelta.getDistance() >= 12.dp.toPx()) {
          // Use the ORIGINAL tile position. Its live bounds can move with graphicsLayer.
          val drop=origin+dragDelta
-         val candidates=tileBounds.entries.filter { it.key!=tile.id }
-         val target=(candidates.firstOrNull { it.value.contains(drop) }
-          ?:candidates.minByOrNull { (_,rect) -> (rect.center-drop).getDistance() })?.key
-         if(target!=null) {
-          val from=orderedIds.indexOf(tile.id)
-          val to=orderedIds.indexOf(target)
-          if(from>=0 && to>=0) moveTile(tile.id,to-from)
+         val cellWidth=(maxWidth-20.dp-30.dp).value/4f
+         val density=context.resources.displayMetrics.density
+         val gridLeft=tileBounds.values.minOfOrNull { it.left }?:0f
+         val gridTop=tileBounds.values.minOfOrNull { it.top }?:0f
+         val col=((drop.x-gridLeft)/(cellWidth*density+10.dp.value*density)).toInt().coerceIn(0,3)
+         val row=((drop.y-gridTop)/(cellWidth*density+10.dp.value*density)).toInt().coerceAtLeast(0)
+         val targetCell=row*4+col
+         val width=span.coerceIn(1,4)
+         if(col+width<=4) {
+          val occupied=cellPositions.filterKeys { it!=tile.id }.toMutableMap()
+          val destination=targetCell
+          // Shift colliding tiles forward rather than replacing them.
+          val collisions=orderedTiles.filter { other ->
+           other.id!=tile.id && run {
+            val otherStart=occupied[other.id]?:-100
+            val otherWidth=(sizes[other.id]?:other.defaultSpan).coerceIn(1,4)
+            (destination until destination+width).any { it in otherStart until otherStart+otherWidth }
+           }
+          }
+          collisions.forEach { other -> cellPositions[other.id]=destination+width }
+          cellPositions[tile.id]=destination
+          cellPositions.forEach { (id,cell) -> prefs.edit().putInt("cell_"+id,cell).apply() }
          }
         }
         draggingTile=null;dragDelta=Offset.Zero;dragOrigin=null
@@ -580,6 +627,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
        })
       }
      }
+    }
     }
    }
    item(span={androidx.compose.foundation.lazy.grid.GridItemSpan(4)}) {
