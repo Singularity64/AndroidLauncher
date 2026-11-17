@@ -93,8 +93,8 @@ class MainActivity : ComponentActivity() {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
-      else LazyVerticalGrid(columns=GridCells.Fixed(4),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-       gridItems(ranked,key={it.activityInfo.packageName}) { app -> AppGridItem(app,packageManager,::launch,true) }
+      else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+       gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
      }
     } else if(drawer) {
@@ -151,6 +151,27 @@ class MainActivity : ComponentActivity() {
  }
 }
 
+@Composable private fun MultitaskCard(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
+ val pkg=app.activityInfo.packageName
+ val icon=remember(pkg) {
+  try {
+   val drawable=app.loadIcon(pm)
+   val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+   drawable.setBounds(0,0,96,96)
+   drawable.draw(Canvas(bitmap))
+   bitmap.asImageBitmap()
+  } catch (_:Exception) { null }
+ }
+ Column(Modifier.fillMaxWidth().background(Color(0xFF263448),RoundedCornerShape(16.dp)).clickable { onLaunch(pkg) }.padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+  Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(20.dp))
+   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+  }
+  Box(Modifier.fillMaxWidth().padding(top=7.dp).aspectRatio(0.72f).background(Color(0xFF17212E),RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
+   Text("Náhled\nnedostupný",color=Color(0xFF8493A8),fontSize=10.sp,lineHeight=14.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+  }
+ }
+}
 @Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) {
