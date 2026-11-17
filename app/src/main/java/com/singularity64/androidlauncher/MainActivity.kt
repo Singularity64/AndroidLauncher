@@ -459,6 +459,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  } }
  val orderedTiles=orderedIds.mapNotNull { id -> tiles.firstOrNull { it.id==id } }
  val tileBounds=remember { mutableStateMapOf<String,Rect>() }
+ val emptyBounds=remember { mutableStateMapOf<Int,Rect>() }
  var draggingTile by remember { mutableStateOf<String?>(null) }
  var dragDelta by remember { mutableStateOf(Offset.Zero) }
  var dragOrigin by remember { mutableStateOf<Offset?>(null) }
@@ -478,26 +479,24 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   tiles.forEach { put(it.id,prefs.getInt("height_"+it.id,it.defaultHeight)) }
  } }
  // Place tiles in four columns; gaps inside rows are preserved, empty whole rows removed.
+ // Stable four-column packing. Every tile reserves its full horizontal span.
  fun buildCells():List<Pair<HomeTileSpec?,Int>> {
-  val occupied=mutableMapOf<Int,HomeTileSpec>()
-  val result=mutableMapOf<Int,Pair<HomeTileSpec?,Int>>()
-  val ordered=orderedTiles.sortedWith(compareBy<HomeTileSpec> { cellPositions[it.id]?:Int.MAX_VALUE }.thenBy { orderedIds.indexOf(it.id) })
-  ordered.forEach { tile ->
+  val occupied=mutableSetOf<Int>()
+  val starts=mutableMapOf<Int,Pair<HomeTileSpec,Int>>()
+  orderedTiles.forEach { tile ->
    val width=(sizes[tile.id]?:tile.defaultSpan).coerceIn(1,4)
    var start=(cellPositions[tile.id]?:0).coerceAtLeast(0)
-   if(!cellPositions.containsKey(tile.id)) start=(occupied.keys.maxOrNull()?.plus(1)?:0)
-   while(start%4+width>4 || (0 until width).any { occupied.containsKey(start+it) }) start++
-   for(i in 0 until width) occupied[start+i]=tile
-   result[start]=tile to width
+   while(start%4+width>4 || (0 until width).any { start+it in occupied }) start++
+   starts[start]=tile to width
+   repeat(width) { occupied.add(start+it) }
   }
-  val usedRows=occupied.keys.map { it/4 }.distinct().sorted()
+  val rows=occupied.map { it/4 }.distinct().sorted()
   val cells=mutableListOf<Pair<HomeTileSpec?,Int>>()
-  usedRows.forEach { row ->
+  rows.forEach { row ->
    var col=0
    while(col<4) {
-    val index=row*4+col
-    val entry=result[index]
-    if(entry!=null) { cells.add(entry);col+=entry.second }
+    val entry=starts[row*4+col]
+    if(entry!=null) { cells.add(entry.first to entry.second);col+=entry.second }
     else { cells.add(null to 1);col++ }
    }
   }
@@ -544,7 +543,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   ) {
    gridItems(gridCells,span={ entry -> androidx.compose.foundation.lazy.grid.GridItemSpan(entry.second) }) { entry ->
     val tile=entry.first
-    if(tile==null) { Spacer(Modifier.fillMaxWidth().height(1.dp)) } else {
+    if(tile==null) { val emptyIndex=gridCells.takeWhile { it !== entry }.size; Spacer(Modifier.fillMaxWidth().height((maxWidth-50.dp)/4).onGloballyPositioned { emptyBounds[emptyIndex]=it.boundsInRoot() }) } else {
     val span=entry.second
     val height=(heights[tile.id]?:tile.defaultHeight).coerceAtLeast(if(hideLabels) 82 else 108)
     val smallSide=(maxWidth-20.dp-30.dp)/4
@@ -571,29 +570,42 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
         if(origin!=null && dragDelta.getDistance() >= 12.dp.toPx()) {
          // Use the ORIGINAL tile position. Its live bounds can move with graphicsLayer.
          val drop=origin+dragDelta
-         val cellWidth=(maxWidth-20.dp-30.dp).value/4f
+         // Use the dragged tile's LEFT edge, not its centre, for multi-cell tiles.
+         val source=tileBounds[tile.id]
+         val left=(source?.left?:origin.x)+dragDelta.x
+         val top=(source?.top?:origin.y)+dragDelta.y
+         val otherRects=tileBounds.filterKeys { it!=tile.id }
+         val anchors=otherRects.values.map { it.left }.plus(emptyBounds.values.map { it.left })
+         val gridLeft=anchors.minOrNull()?:left
          val density=context.resources.displayMetrics.density
-         val gridLeft=tileBounds.values.minOfOrNull { it.left }?:0f
-         val gridTop=tileBounds.values.minOfOrNull { it.top }?:0f
-         val col=((drop.x-gridLeft)/(cellWidth*density+10.dp.value*density)).toInt().coerceIn(0,3)
-         val row=((drop.y-gridTop)/(cellWidth*density+10.dp.value*density)).toInt().coerceAtLeast(0)
-         val targetCell=row*4+col
+         val unit=((maxWidth-50.dp)/4).value*density+10.dp.value*density
          val width=span.coerceIn(1,4)
-         if(col+width<=4) {
-          val occupied=cellPositions.filterKeys { it!=tile.id }.toMutableMap()
-          val destination=targetCell
-          // Shift colliding tiles forward rather than replacing them.
-          val collisions=orderedTiles.filter { other ->
-           other.id!=tile.id && run {
-            val otherStart=occupied[other.id]?:-100
-            val otherWidth=(sizes[other.id]?:other.defaultSpan).coerceIn(1,4)
-            (destination until destination+width).any { it in otherStart until otherStart+otherWidth }
-           }
-          }
-          collisions.forEach { other -> cellPositions[other.id]=destination+width }
-          cellPositions[tile.id]=destination
-          cellPositions.forEach { (id,cell) -> prefs.edit().putInt("cell_"+id,cell).apply() }
+         val col=kotlin.math.round((left-gridLeft)/unit).toInt().coerceIn(0,4-width)
+         val rowAnchors=(otherRects.values.map { it.top }+emptyBounds.values.map { it.top }).distinct().sorted()
+         val row=if(rowAnchors.isEmpty()) 0 else rowAnchors.indices.minByOrNull { kotlin.math.abs(rowAnchors[it]-top) }?:0
+         val destination=row*4+col
+         // Resolve all collisions using the complete spans, including previously unpositioned tiles.
+         val newPositions=mutableMapOf<String,Int>()
+         val reserved=mutableSetOf<Int>()
+         newPositions[tile.id]=destination
+         repeat(width) { reserved.add(destination+it) }
+         orderedTiles.filter { it.id!=tile.id }.forEach { other ->
+          val w=(sizes[other.id]?:other.defaultSpan).coerceIn(1,4)
+          var place=(cellPositions[other.id]?:0).coerceAtLeast(0)
+          while(place%4+w>4 || (0 until w).any { place+it in reserved }) place++
+          newPositions[other.id]=place
+          repeat(w) { reserved.add(place+it) }
          }
+         // Compact entirely empty rows, preserving gaps within occupied rows.
+         val usedRows=newPositions.values.map { it/4 }.distinct().sorted()
+         val compact=usedRows.withIndex().associate { it.value to it.index }
+         newPositions.forEach { (id,place) ->
+          val saved=compact.getValue(place/4)*4+place%4
+          cellPositions[id]=saved
+         }
+         val edit=prefs.edit()
+         cellPositions.forEach { (id,cell) -> edit.putInt("cell_"+id,cell) }
+         edit.apply()
         }
         draggingTile=null;dragDelta=Offset.Zero;dragOrigin=null
        },
