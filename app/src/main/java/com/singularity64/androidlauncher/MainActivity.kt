@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
     val prefs = remember { getSharedPreferences("mosaic_usage",Context.MODE_PRIVATE) }
     var drawer by remember { mutableStateOf(false) }
     var multitask by remember { mutableStateOf(false) }
-    var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",true)) }
+    var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",false)) }
     var search by remember { mutableStateOf("") }
     BackHandler(enabled=true) {
      when {
@@ -187,20 +187,17 @@ class MainActivity : ComponentActivity() {
        trailingIcon={if(search.isNotEmpty()) IconButton(onClick={search=""}) { Icon(Icons.Default.Close,contentDescription="Vymazat") }},
        shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF181818),unfocusedContainerColor=Color(0xFF181818),focusedBorderColor=Color.White,unfocusedBorderColor=Color.Transparent),
        modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp).padding(bottom=14.dp))
-      Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-       Text(if(adaptiveEnabled && scores.isNotEmpty()) "Chytrý výběr pro dnešek" else "Nejčastěji používané dnes",color=Color.White,fontSize=15.sp)
-       Text(if(showFrequent) "Skrýt" else "Zobrazit",color=Color(0xFF8CCBFF),modifier=Modifier.clickable {
+      if(search.isBlank()) {
+       Row(Modifier.fillMaxWidth().clickable {
         showFrequent=!showFrequent
         prefs.edit().putBoolean("show_frequent",showFrequent).apply()
-       })
-      }
-      if(search.isBlank()) {
-       Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-        Text("Adaptivní řazení",color=Color.LightGray,fontSize=12.sp)
-        Switch(checked=adaptiveEnabled,onCheckedChange={ adaptiveEnabled=it; prefs.edit().putBoolean("adaptive_enabled",it).apply() },modifier=Modifier.height(28.dp))
+       }.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically,
+        horizontalArrangement=Arrangement.SpaceBetween) {
+        Text("Nejčastěji používané aplikace",color=Color.White,fontSize=15.sp)
+        Text(if(showFrequent) "⌃" else "⌄",color=Color.White,fontSize=22.sp)
        }
        if(adaptiveEnabled && !usageAccess(this@MainActivity)) {
-        Text("Pro učení podle času a dnů povol přístup k údajům o používání.",color=Color.LightGray,fontSize=12.sp)
+        Text("Pro automatické řazení povol přístup k údajům o používání.",color=Color.LightGray,fontSize=12.sp)
         Text("Povolit přístup",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(vertical=8.dp))
        }
       }
