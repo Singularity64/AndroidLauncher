@@ -146,6 +146,7 @@ class MainActivity : ComponentActivity() {
     var showLauncherSettings by remember { mutableStateOf(false) }
     var dimOtherTiles by remember { mutableStateOf(homePrefs.getBoolean("dim_other_tiles",false)) }
     var showNotificationAppPicker by remember { mutableStateOf(false) }
+    var notificationAppSearch by remember { mutableStateOf("") }
     val priorityApps=remember { mutableStateListOf<String>().apply { addAll(homePrefs.getString("priority_notification_apps","")!!.split("|").filter { it.isNotBlank() }) } }
     var showNotificationPermission by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -345,11 +346,16 @@ class MainActivity : ComponentActivity() {
      dismissButton={TextButton(onClick={showNotificationPermission=false}) { Text("Později") }}
     )
     if(showNotificationAppPicker) AlertDialog(
-     onDismissRequest={showNotificationAppPicker=false},
+     onDismissRequest={showNotificationAppPicker=false;notificationAppSearch=""},
      title={Text("Vybrané aplikace")},
      text={
-      Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState())) {
-       apps.forEach { app ->
+      Column(Modifier.heightIn(max=460.dp)) {
+       OutlinedTextField(value=notificationAppSearch,onValueChange={notificationAppSearch=it},
+        placeholder={Text("Hledat aplikaci…")},singleLine=true,
+        leadingIcon={Icon(Icons.Default.Search,contentDescription=null)},
+        modifier=Modifier.fillMaxWidth().padding(bottom=8.dp))
+       Column(Modifier.weight(1f,fill=false).verticalScroll(rememberScrollState())) {
+       apps.filter { it.loadLabel(packageManager).toString().contains(notificationAppSearch,ignoreCase=true) }.forEach { app ->
         val pkg=app.activityInfo.packageName
         Row(Modifier.fillMaxWidth().clickable {
          if(pkg in priorityApps) priorityApps.remove(pkg) else priorityApps.add(pkg)
@@ -359,12 +365,15 @@ class MainActivity : ComponentActivity() {
           if(checked) { if(pkg !in priorityApps) priorityApps.add(pkg) } else priorityApps.remove(pkg)
           homePrefs.edit().putString("priority_notification_apps",priorityApps.joinToString("|")).apply()
          })
-         Text(app.loadLabel(packageManager).toString(),fontSize=14.sp)
+         val icon=remember(pkg) { try { monochromeIcon(app.loadIcon(packageManager)) } catch (_:Exception) { null } }
+         if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(23.dp).padding(end=3.dp))
+         Text(app.loadLabel(packageManager).toString(),fontSize=14.sp,modifier=Modifier.padding(start=6.dp))
         }
+       }
        }
       }
      },
-     confirmButton={TextButton(onClick={showNotificationAppPicker=false}) { Text("Hotovo") }}
+     confirmButton={TextButton(onClick={showNotificationAppPicker=false;notificationAppSearch=""}) { Text("Hotovo") }}
     )
     if(showLauncherSettings) AlertDialog(
      onDismissRequest={showLauncherSettings=false},
@@ -375,12 +384,13 @@ class MainActivity : ComponentActivity() {
         Text("Skrýt názvy dlaždic na ploše",modifier=Modifier.weight(1f))
         Switch(checked=hideHomeLabels,onCheckedChange={hideHomeLabels=it;homePrefs.edit().putBoolean("hide_home_labels",it).apply()})
        }
-       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-        Text("Zesednout ostatní dlaždice při oznámení",modifier=Modifier.weight(1f))
+       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f)) {
+         Text("Zesednout ostatní dlaždice při oznámení",fontSize=14.sp)
+         if(dimOtherTiles) Text("Vybrat aplikace (${priorityApps.size})",color=Color(0xFF8CCBFF),fontSize=12.sp,
+          modifier=Modifier.clickable { showLauncherSettings=false;notificationAppSearch="";showNotificationAppPicker=true }.padding(top=5.dp))
+        }
         Switch(checked=dimOtherTiles,onCheckedChange={dimOtherTiles=it;homePrefs.edit().putBoolean("dim_other_tiles",it).apply()})
-       }
-       if(dimOtherTiles) TextButton(onClick={showLauncherSettings=false;showNotificationAppPicker=true}) {
-        Text("Vybrat aplikace (${priorityApps.size})")
        }
       }
      },
