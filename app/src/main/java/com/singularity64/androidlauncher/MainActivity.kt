@@ -256,10 +256,14 @@ class MainActivity : ComponentActivity() {
  val icon=remember(pkg) {
   try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
  }
- Row(Modifier.fillMaxWidth().clickable { onLaunch(pkg) }.padding(vertical=12.dp,horizontal=6.dp),
-  verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(28.dp))
-  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=14.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+ Column(Modifier.fillMaxWidth().background(Color(0xFF1C1C1C),RoundedCornerShape(14.dp))
+  .clickable { onLaunch(pkg) }.padding(horizontal=8.dp,vertical=14.dp),
+  horizontalAlignment=Alignment.CenterHorizontally,
+  verticalArrangement=Arrangement.spacedBy(8.dp)) {
+  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(36.dp))
+  else Text("▦",color=Color.White,fontSize=30.sp)
+  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
+   overflow=TextOverflow.Ellipsis)
  }
 }
 @Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false) {
