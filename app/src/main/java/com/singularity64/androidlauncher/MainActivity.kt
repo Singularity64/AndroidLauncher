@@ -55,7 +55,12 @@ private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx
  val source=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
  drawable.setBounds(0,0,96,96)
  drawable.draw(Canvas(source))
- val matrix=ColorMatrix().apply { setSaturation(0f) }
+ val matrix=ColorMatrix(floatArrayOf(
+  0f,0f,0f,0f,255f,
+  0f,0f,0f,0f,255f,
+  0f,0f,0f,0f,255f,
+  0f,0f,0f,1f,0f
+ ))
  Canvas(bitmap).drawBitmap(source,0f,0f,Paint(Paint.ANTI_ALIAS_FLAG).apply { colorFilter=ColorMatrixColorFilter(matrix) })
  source.recycle()
  return bitmap.asImageBitmap()
