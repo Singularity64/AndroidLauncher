@@ -142,7 +142,9 @@ class MainActivity : ComponentActivity() {
     var showLauncherSettings by remember { mutableStateOf(false) }
     fun addToHome(pkg:String) {
      val pinned=homePrefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() }
-     if(pkg !in pinned) { homePrefs.edit().putString("pinned_apps",(pinned+pkg).joinToString("|")).apply();homeRevision++ }
+     val hidden=homePrefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() && it!="pinned_$pkg" }.toSet()
+     homePrefs.edit().putString("hidden_tiles",hidden.joinToString("|")).putString("pinned_apps",(pinned+pkg).distinct().joinToString("|")).apply()
+     homeRevision++
      drawer=false;search=""
     }
     BackHandler(enabled=true) {
@@ -225,7 +227,7 @@ class MainActivity : ComponentActivity() {
         .thenBy { it.loadLabel(packageManager).toString() }).take(8)
      }
      val filtered=apps.filter { it.loadLabel(packageManager).toString().startsWith(search,ignoreCase=true) }
-     Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
+     Column(Modifier.fillMaxSize().background(Color.Transparent).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
       Row(Modifier.fillMaxWidth().padding(bottom=12.dp),verticalAlignment=Alignment.CenterVertically,
        horizontalArrangement=Arrangement.SpaceBetween) {
        Text("‹ Aplikace",color=Color.White,fontSize=26.sp,
@@ -250,7 +252,7 @@ class MainActivity : ComponentActivity() {
       OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
        leadingIcon={Icon(Icons.Default.Search,contentDescription=null)},
        trailingIcon={if(search.isNotEmpty()) IconButton(onClick={search=""}) { Icon(Icons.Default.Close,contentDescription="Vymazat") }},
-       shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF181818),unfocusedContainerColor=Color(0xFF181818),focusedBorderColor=Color.White,unfocusedBorderColor=Color.Transparent),
+       shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xAA181818),unfocusedContainerColor=Color(0xAA181818),focusedBorderColor=Color.White,unfocusedBorderColor=Color.Transparent),
        modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp).padding(bottom=14.dp))
       val collapsed=remember { mutableStateMapOf<String,Boolean>() }
       val rankedApps=filtered.sortedWith(compareByDescending<ResolveInfo> {
@@ -267,7 +269,7 @@ class MainActivity : ComponentActivity() {
          val alphabetic=filtered.sortedWith(compareBy<ResolveInfo> {
           it.loadLabel(packageManager).toString().lowercase(Locale.getDefault())
          }.thenBy { it.activityInfo.packageName })
-         Column(Modifier.fillMaxWidth().background(Color(0xFF17191E),RoundedCornerShape(20.dp))
+         Column(Modifier.fillMaxWidth().background(Color(0xB817191E),RoundedCornerShape(20.dp))
           .border(1.dp,Color(0xFF424751),RoundedCornerShape(20.dp)).padding(12.dp),
           verticalArrangement=Arrangement.spacedBy(10.dp)) {
           Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
@@ -321,7 +323,7 @@ class MainActivity : ComponentActivity() {
       }
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
-      homeRevision=homeRevision,hideLabels=hideHomeLabels,onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
+      homeRevision=homeRevision,hideLabels=hideHomeLabels,onTileRemoved={homeRevision++})
     if(showLauncherSettings) AlertDialog(
      onDismissRequest={showLauncherSettings=false},
      title={Text("Nastavení launcheru")},
@@ -376,7 +378,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  content:@Composable ColumnScope.()->Unit
 ) {
  Column(Modifier.fillMaxWidth()
-  .background(Brush.verticalGradient(listOf(tint.copy(alpha=0.94f),tint.copy(alpha=0.72f))),RoundedCornerShape(20.dp))
+  .background(Brush.verticalGradient(listOf(tint.copy(alpha=0.68f),tint.copy(alpha=0.42f))),RoundedCornerShape(20.dp))
   .border(1.dp,accent.copy(alpha=0.78f),RoundedCornerShape(20.dp))
   .padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
   Row(Modifier.fillMaxWidth().clickable(onClick=onToggle).padding(vertical=3.dp),
@@ -441,7 +443,7 @@ private fun packWithPriority(
  return result.mapValues { (_,p) -> rowMap.getValue(p/4)*4+p%4 }
 }
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,hideLabels:Boolean,onSelfUninstall:()->Unit) {
+@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,hideLabels:Boolean,onTileRemoved:()->Unit) {
  val context=LocalContext.current
  val prefs=remember { context.getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
  val time=remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
@@ -461,11 +463,12 @@ private fun packWithPriority(
   HomeTileSpec("multitask","Multitasking","▤",Color(0xFF273B52),Color(0xFF38617B),4,94),
   HomeTileSpec("music","Hudba","♫",purple,navy,4,118,"com.google.android.apps.youtube.music")
  )
+ val hidden=prefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() }.toSet()
  val pinned=prefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() && it in apps }
- defaults+pinned.filter { pkg -> defaults.none { it.appPackage==pkg } }.map { pkg ->
+ (defaults+pinned.filter { pkg -> defaults.none { it.appPackage==pkg } }.map { pkg ->
   val label=try { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg,0)).toString() } catch (_:Exception) { pkg }
   HomeTileSpec("pinned_$pkg",label,"▦",Color(0xFF263752),Color(0xFF365879),1,72,pkg)
- }
+ }).filter { it.id !in hidden }
  }
  val orderedIds=remember(tiles) {
   val saved=prefs.getString("tile_order","")!!.split("|").filter { it.isNotBlank() }
@@ -628,12 +631,20 @@ private fun packWithPriority(
       }
      
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-      DropdownMenuItem(text={Text("Posunout na začátek")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-orderedIds.size);menu=false})
-      DropdownMenuItem(text={Text("Posunout o místo zpět")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-1);menu=false})
-      DropdownMenuItem(text={Text("Posunout o místo dál")},enabled=orderedIds.indexOf(tile.id)<orderedIds.lastIndex,onClick={moveTile(tile.id,1);menu=false})
-      DropdownMenuItem(text={Text("Posunout na konec")},enabled=orderedIds.indexOf(tile.id)<orderedIds.lastIndex,onClick={moveTile(tile.id,orderedIds.size);menu=false})
+      DropdownMenuItem(text={Text("Odebrat z plochy",color=Color(0xFFFF5252))},onClick={
+       val hidden=prefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() }.toMutableSet()
+       hidden.add(tile.id)
+       val edit=prefs.edit().putString("hidden_tiles",hidden.joinToString("|"))
+       if(tile.id.startsWith("pinned_")) {
+        val pkg=tile.id.removePrefix("pinned_")
+        val pinned=prefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() && it!=pkg }
+        edit.putString("pinned_apps",pinned.joinToString("|"))
+       }
+       edit.apply()
+       menu=false
+       onTileRemoved()
+      })
       HorizontalDivider()
-
       listOf(Triple(1,1,"Malá 1 × 1"),Triple(2,1,"Široká 2 × 1"),Triple(2,2,"Velká 2 × 2"),Triple(4,1,"Pruh 4 × 1")).forEach { (newSpan,newRows,title) ->
        DropdownMenuItem(text={Text(title)},onClick={
         sizes[tile.id]=newSpan
