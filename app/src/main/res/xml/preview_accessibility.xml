@@ -4,4 +4,5 @@
  android:accessibilityFeedbackType="feedbackGeneric"
  android:notificationTimeout="200"
  android:canRetrieveWindowContent="false"
+ android:canTakeScreenshot="true"
  android:description="@string/preview_accessibility_description"/>
