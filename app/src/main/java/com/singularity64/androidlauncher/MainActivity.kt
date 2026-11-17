@@ -603,16 +603,6 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFF5977FF),Color(0xFFF044F7)
   )),glassShape)
   .combinedClickable(onClick=click,onLongClick=onLongClick).padding(if(compact) 5.dp else 12.dp)) {
-  Box(Modifier.matchParentSize().background(
-   Brush.linearGradient(listOf(
-    Color.White.copy(alpha=0.24f),
-    Color(0xFF58D7FF).copy(alpha=0.09f),
-    Color.Transparent,
-    Color(0xFFDB4CFF).copy(alpha=0.14f)
-   ),start=Offset.Zero,end=Offset(760f,940f)),glassShape))
-  Box(Modifier.matchParentSize().border(1.dp,
-   Brush.linearGradient(listOf(Color.White.copy(alpha=0.65f),Color.Transparent,Color(0xFFFFA8FC).copy(alpha=0.68f))),
-   glassShape))
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
