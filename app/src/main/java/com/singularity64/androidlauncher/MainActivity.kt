@@ -666,6 +666,12 @@ private fun packWithPriority(
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
+  } else if(!compact) Row(Modifier.fillMaxSize(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
+   val context=LocalContext.current
+   val icon=remember(appPackage) { appPackage?.let { pkg -> try { monochromeIcon(context.packageManager.getApplicationIcon(pkg)) } catch (_:Exception) { null } } }
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(36.dp))
+   else Text(symbol,color=Color.White,fontSize=30.sp)
+   if(!hideLabel) { Spacer(Modifier.width(12.dp));Text(label,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis) }
   } else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
    val context=LocalContext.current
    val icon=remember(appPackage) {
