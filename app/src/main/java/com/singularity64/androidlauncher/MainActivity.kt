@@ -12,6 +12,9 @@ import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
    MaterialTheme(colorScheme=darkColorScheme(background=bg,surface=bg,onSurface=Color.White)) {
     val prefs = remember { getSharedPreferences("mosaic_usage",Context.MODE_PRIVATE) }
     var drawer by remember { mutableStateOf(false) }
+    var multitask by remember { mutableStateOf(false) }
     var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",true)) }
     var search by remember { mutableStateOf("") }
     var usageRevision by remember { mutableIntStateOf(0) }
@@ -65,11 +69,25 @@ class MainActivity : ComponentActivity() {
       startActivity(intent)
       val day=today()
       if(prefs.getString("usage_day","") != day) prefs.edit().clear().putString("usage_day",day).putBoolean("show_frequent",showFrequent).apply()
-      prefs.edit().putInt("count_$pkg",prefs.getInt("count_$pkg",0)+1).apply()
+      prefs.edit().putInt("count_$pkg",prefs.getInt("count_$pkg",0)+1).putInt("week_${day}_$pkg",prefs.getInt("week_${day}_$pkg",0)+1).apply()
       usageRevision++
      } catch (_:Exception) { }
     }
-    if(drawer) {
+    if(multitask) {
+     val todayMs=System.currentTimeMillis()
+     val days=(0..6).map { offset -> SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date(todayMs-offset*86400000L)) }
+     val ranked=apps.map { app -> app to days.sumOf { d -> prefs.getInt("week_${d}_${app.activityInfo.packageName}",0) } }
+      .filter { it.second>0 }.sortedWith(compareByDescending<Pair<ResolveInfo,Int>> { it.second }.thenBy { it.first.loadLabel(packageManager).toString() }).map { it.first }
+     val revision=usageRevision
+     Column(Modifier.fillMaxSize().background(bg).padding(16.dp)) {
+      Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
+      Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
+      if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
+      else LazyVerticalGrid(columns=GridCells.Fixed(4),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+       gridItems(ranked,key={it.activityInfo.packageName}) { app -> AppGridItem(app,packageManager,::launch,true) }
+      }
+     }
+    } else if(drawer) {
      val day=today()
      if(prefs.getString("usage_day","") != day) {
       prefs.edit().clear().putString("usage_day",day).putBoolean("show_frequent",showFrequent).apply()
@@ -83,8 +101,11 @@ class MainActivity : ComponentActivity() {
      val filtered=apps.filter { it.loadLabel(packageManager).toString().contains(search,ignoreCase=true) }
      Column(Modifier.fillMaxSize().background(bg).padding(horizontal=12.dp,vertical=20.dp)) {
       Text("‹  Aplikace",color=Color.White,fontSize=26.sp,modifier=Modifier.clickable { drawer=false }.padding(bottom=12.dp))
-      OutlinedTextField(value=search,onValueChange={search=it},label={Text("Hledat aplikace")},singleLine=true,
-       modifier=Modifier.fillMaxWidth().padding(bottom=10.dp))
+      OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
+       leadingIcon={Icon(Icons.Default.Search,contentDescription=null)},
+       trailingIcon={if(search.isNotEmpty()) IconButton(onClick={search=""}) { Icon(Icons.Default.Close,contentDescription="Vymazat") }},
+       shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF283447),unfocusedContainerColor=Color(0xFF222C3B),focusedBorderColor=Color(0xFF6B94C4),unfocusedBorderColor=Color.Transparent),
+       modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp).padding(bottom=14.dp))
       Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
        Text("Nejčastěji používané dnes",color=Color.White,fontSize=15.sp)
        Text(if(showFrequent) "Skrýt" else "Zobrazit",color=Color(0xFF8CCBFF),modifier=Modifier.clickable {
@@ -108,19 +129,19 @@ class MainActivity : ComponentActivity() {
        }
       }
       Text("Všechny aplikace",color=Color.White,fontSize=16.sp,modifier=Modifier.padding(bottom=8.dp))
-      LazyVerticalGrid(columns=GridCells.Fixed(8),horizontalArrangement=Arrangement.spacedBy(3.dp),
+      LazyVerticalGrid(columns=GridCells.Fixed(5),horizontalArrangement=Arrangement.spacedBy(3.dp),
        verticalArrangement=Arrangement.spacedBy(12.dp),modifier=Modifier.fillMaxSize()) {
        gridItems(filtered,key={it.activityInfo.packageName}) { app -> AppGridItem(app,packageManager,::launch) }
       }
      }
-    } else Home(onApps={search="";drawer=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
+    } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
       onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
    }
   }
  }
 }
 
-@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
+@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) {
   try {
@@ -131,20 +152,20 @@ class MainActivity : ComponentActivity() {
    bitmap.asImageBitmap()
   } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
+ Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.padding(vertical=7.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
-  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=8.sp,maxLines=2,
+  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
  }
 }
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Home(onApps:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
+@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
  val time = remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
  val date = remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
  Column(Modifier.fillMaxSize().background(bg).verticalScroll(rememberScrollState()).padding(horizontal=10.dp, vertical=28.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("$"+"time\n$"+"date", "◷", navy, purple, Modifier.weight(1f).height(145.dp), big=true) {}
+   Tile("$time\n$date", "◷", navy, purple, Modifier.weight(1f).height(145.dp), big=true) {}
    Tile("Pošta", "✉", blue, Color(0xFF028AD6), Modifier.weight(1f).height(145.dp), appPackage="com.google.android.gm") { onLaunch("com.google.android.gm") }
   }
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -162,6 +183,7 @@ class MainActivity : ComponentActivity() {
    Tile("Chrome", "◉", Color(0xFF1648A2), blue, Modifier.weight(1f).height(112.dp), appPackage="com.android.chrome") { onLaunch("com.android.chrome") }
    Tile("Nastavení", "⚙", Color(0xFF353945), Color(0xFF545A6B), Modifier.weight(1f).height(112.dp), appPackage="com.android.settings") { onLaunch("com.android.settings") }
   }
+  Tile("Multitasking", "▤", Color(0xFF273B52), Color(0xFF38617B), Modifier.fillMaxWidth().height(94.dp), click=onMultitask)
   Tile("Hudba", "♫", purple, navy, Modifier.fillMaxWidth().height(118.dp), appPackage="com.google.android.apps.youtube.music") { onLaunch("com.google.android.apps.youtube.music") }
   Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF283447),RoundedCornerShape(15.dp))
    .combinedClickable(onClick={},onLongClick=onSelfUninstall).padding(15.dp)) {
