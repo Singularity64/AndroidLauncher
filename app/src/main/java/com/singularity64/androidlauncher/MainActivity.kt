@@ -420,7 +420,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val id:String,val label:String,val symbol:String,val start:Color,val end:Color,
  val defaultSpan:Int,val defaultHeight:Int,val appPackage:String?=null,val big:Boolean=false
 )
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun packWithPriority(
  first:String,positions:Map<String,Int>,tiles:List<HomeTileSpec>,
  dimensions:(HomeTileSpec)->Pair<Int,Int>
