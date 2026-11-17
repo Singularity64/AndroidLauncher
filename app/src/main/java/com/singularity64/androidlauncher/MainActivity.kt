@@ -463,28 +463,31 @@ class MainActivity : ComponentActivity() {
 
 @Composable private fun MultitaskCard(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
  val pkg=app.activityInfo.packageName
- val icon=remember(pkg) {
-  try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
- }
- val shape=RoundedCornerShape(18.dp)
+ val icon=remember(pkg) { try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null } }
  val preview=remember(pkg) { AppPreviewCache.get(pkg) }
- Box(Modifier.fillMaxWidth().height(112.dp)
-  .background(Brush.linearGradient(listOf(Color(0xFF3CAEE8).copy(alpha=0.52f),Color(0xFF102D58).copy(alpha=0.55f),Color(0xFFAE40D9).copy(alpha=0.48f))),shape)
-  .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFFF044F7))),shape)
-  .clickable { onLaunch(pkg) }) {
-  if(preview!=null) {
-   Image(bitmap=preview.asImageBitmap(),contentDescription="Poslední snímek aplikace",
-    contentScale=androidx.compose.ui.layout.ContentScale.Crop,modifier=Modifier.fillMaxSize())
-   Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.30f)))
+ val shape=RoundedCornerShape(18.dp)
+ Column(Modifier.fillMaxWidth().height(142.dp)
+  .background(Color(0xFF171B24),shape)
+  .border(1.dp,Color(0xFF424957),shape)
+  .clickable { onLaunch(pkg) }.padding(5.dp)) {
+  Box(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF10131A),RoundedCornerShape(13.dp)),
+   contentAlignment=Alignment.Center) {
+   if(preview!=null) {
+    Image(bitmap=preview.asImageBitmap(),contentDescription="Poslední snímek aplikace",
+     contentScale=androidx.compose.ui.layout.ContentScale.Crop,modifier=Modifier.fillMaxSize())
+   } else {
+    if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(42.dp))
+    else Text("▦",color=Color.White,fontSize=28.sp)
+   }
   }
-  Column(Modifier.fillMaxSize().padding(horizontal=8.dp,vertical=9.dp),
-   horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(48.dp))
-   else Text("▦",color=Color.White,fontSize=30.sp)
-   Spacer(Modifier.height(8.dp))
-   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
-    textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth(),
-    overflow=TextOverflow.Ellipsis)
+  Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal=4.dp),
+   verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
+   if(preview!=null && icon!=null) {
+    Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(18.dp))
+    Spacer(Modifier.width(5.dp))
+   }
+   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=11.sp,maxLines=1,
+    overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
   }
  }
 }
@@ -651,6 +654,7 @@ private fun packWithPriority(
  val layout=pack(cellPositions)
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
+ var swipeStartedAt by remember { mutableLongStateOf(0L) }
  BoxWithConstraints(Modifier.fillMaxSize()) {
   val screenHeightPx=with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
   val gap=10.dp
@@ -686,9 +690,9 @@ private fun packWithPriority(
     }
    }.pointerInput(screenHeightPx) {
     detectVerticalDragGestures(
-     onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f },
+     onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f;swipeStartedAt=android.os.SystemClock.uptimeMillis() },
      onVerticalDrag={ change,amount -> if(gestureStartNearBottom && draggingTile==null) { swipeDistance+=amount;change.consume() } },
-     onDragEnd={ if(gestureStartNearBottom && swipeDistance < -160.dp.toPx()) onMultitask();gestureStartNearBottom=false },
+     onDragEnd={ if(gestureStartNearBottom && swipeDistance < -160.dp.toPx() && android.os.SystemClock.uptimeMillis()-swipeStartedAt>=450L) onMultitask();gestureStartNearBottom=false },
      onDragCancel={ gestureStartNearBottom=false }
     )
    }.statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal=10.dp,vertical=12.dp)) {
