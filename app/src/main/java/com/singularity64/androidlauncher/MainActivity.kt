@@ -218,11 +218,11 @@ class MainActivity : ComponentActivity() {
        .sortedWith(compareByDescending<Triple<ResolveInfo,Long,Int>> { it.second }
         .thenByDescending { it.third }
         .thenBy { it.first.loadLabel(packageManager).toString() })
-       .map { it.first }
+       .map { it.first }.take(6)
      }
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
-      Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
+      Text("6 nejpoužívanějších spuštěných aplikací za 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
       else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
