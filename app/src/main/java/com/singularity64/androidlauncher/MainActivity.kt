@@ -124,6 +124,10 @@ private fun appGroup(app:ResolveInfo,pm:android.content.pm.PackageManager):Strin
 class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
+  // Let Android draw the user-selected home wallpaper behind transparent Compose content.
+  window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+  window.setBackgroundDrawableResource(android.R.color.transparent)
+  window.decorView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
   setContent {
    MaterialTheme(colorScheme=darkColorScheme(background=bg,surface=bg,onSurface=Color.White)) {
     val prefs = remember { getSharedPreferences("mosaic_usage",Context.MODE_PRIVATE) }
@@ -468,31 +472,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  } }
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
- BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF080D22))) {
-  // Decorative, non-animated wallpaper behind the grid, matching the approved blue/violet concept.
-  ComposeCanvas(Modifier.fillMaxSize()) {
-   val w=size.width
-   val h=size.height
-   drawRect(brush=Brush.linearGradient(
-    colors=listOf(Color(0xFF071024),Color(0xFF10264E),Color(0xFF191337),Color(0xFF090D20)),
-    start=Offset(0f,0f),end=Offset(w,h)))
-   drawCircle(brush=Brush.radialGradient(
-    colors=listOf(Color(0xFF168BF2).copy(alpha=0.70f),Color(0xFF1253A6).copy(alpha=0.22f),Color.Transparent),
-    center=Offset(w*0.08f,h*0.29f),radius=w*0.91f),
-    radius=w*0.91f,center=Offset(w*0.08f,h*0.29f))
-   drawCircle(brush=Brush.radialGradient(
-    colors=listOf(Color(0xFF9237E9).copy(alpha=0.60f),Color(0xFF4A258F).copy(alpha=0.20f),Color.Transparent),
-    center=Offset(w*0.94f,h*0.76f),radius=w*0.88f),
-    radius=w*0.88f,center=Offset(w*0.94f,h*0.76f))
-   drawCircle(brush=Brush.radialGradient(
-    colors=listOf(Color(0xFF0D7DD9).copy(alpha=0.65f),Color(0xFF10448E).copy(alpha=0.18f),Color.Transparent),
-    center=Offset(w*0.12f,h*1.12f),radius=w*0.86f),
-    radius=w*0.86f,center=Offset(w*0.12f,h*1.12f))
-   drawCircle(brush=Brush.linearGradient(
-    listOf(Color(0xFF4DB9FF).copy(alpha=0.58f),Color(0xFFBD63FF).copy(alpha=0.46f))),
-    radius=w*1.13f,center=Offset(w*0.86f,h*1.65f),
-    style=Stroke(width=2.dp.toPx()))
-  }
+ BoxWithConstraints(Modifier.fillMaxSize()) {
   val screenHeightPx=with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
   LazyVerticalGrid(
    columns=GridCells.Fixed(4),
