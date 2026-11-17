@@ -446,10 +446,12 @@ class MainActivity : ComponentActivity() {
   .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFFF044F7))),shape)
   .clickable { onLaunch(pkg) }.padding(horizontal=8.dp,vertical=9.dp),
   horizontalAlignment=Alignment.CenterHorizontally,
-  verticalArrangement=Arrangement.spacedBy(8.dp)) {
+  verticalArrangement=Arrangement.Center) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(48.dp))
   else Text("▦",color=Color.White,fontSize=30.sp)
+  Spacer(Modifier.height(8.dp))
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
+   textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth(),
    overflow=TextOverflow.Ellipsis)
  }
 }
