@@ -541,14 +541,14 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
      }) {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
       Modifier.fillMaxWidth().height(height.dp),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,
-      onLongClick={}) {
+      onLongClick={menu=true}) {
        when(tile.id) {
         "apps" -> onApps()
         "multitask" -> onMultitask()
         else -> tile.appPackage?.let(onLaunch)
        }
       }
-     Text("⋮",color=Color.White,fontSize=18.sp,modifier=Modifier.align(Alignment.TopEnd).clickable { menu=true }.padding(horizontal=9.dp,vertical=3.dp))
+     
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
       DropdownMenuItem(text={Text("Posunout na začátek")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-orderedIds.size);menu=false})
       DropdownMenuItem(text={Text("Posunout o místo zpět")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-1);menu=false})
