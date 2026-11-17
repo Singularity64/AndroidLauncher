@@ -792,7 +792,7 @@ private fun packWithPriority(
         else -> tile.appPackage?.let(onLaunch)
        }
       }
-      if(tile.appPackage!=null && LauncherNotificationState.activePackages[tile.appPackage]==true) {
+      if(tile.appPackage!=null && LauncherNotificationState.isUnseen(tile.appPackage)) {
        Box(Modifier.align(Alignment.TopEnd).padding(9.dp).size(7.dp).background(Color(0xFFFF5252),androidx.compose.foundation.shape.CircleShape))
       }
      
