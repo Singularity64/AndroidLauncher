@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.*
@@ -57,6 +58,13 @@ class MainActivity : ComponentActivity() {
     var multitask by remember { mutableStateOf(false) }
     var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",true)) }
     var search by remember { mutableStateOf("") }
+    BackHandler(enabled=true) {
+     when {
+      multitask -> multitask=false
+      drawer -> { drawer=false; search="" }
+      else -> { /* Home screen: do not exit the launcher on Back */ }
+     }
+    }
     var usageRevision by remember { mutableIntStateOf(0) }
     val apps = remember {
      packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0)
