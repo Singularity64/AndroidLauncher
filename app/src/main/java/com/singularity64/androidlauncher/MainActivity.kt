@@ -54,86 +54,9 @@ private val purple = Color(0xFF543083)
 private val green = Color(0xFF247B26)
 private val red = Color(0xFFAE2034)
 private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx.compose.ui.graphics.ImageBitmap {
- val size=96
- val bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888)
- drawable.setBounds(0,0,size,size)
+ val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+ drawable.setBounds(0,0,96,96)
  drawable.draw(Canvas(bitmap))
- val pixels=IntArray(size*size)
- bitmap.getPixels(pixels,0,size,0,0,size,size)
- // Estimate the icon background from opaque pixels along all four edges.
- // Transparent rounded corners are excluded from the estimate.
- val edgeColors=ArrayList<Int>()
- for(y in 0 until size) for(x in 0 until size) {
-  if(x!=0 && x!=size-1 && y!=0 && y!=size-1) continue
-  val c=pixels[y*size+x]
-  if(android.graphics.Color.alpha(c)>=200) edgeColors.add(c)
- }
- // Rounded-square icons can have fully transparent outermost edges.
- if(edgeColors.size<8) {
-  for(inset in 1..14) {
-   for(y in inset until size-inset) for(x in inset until size-inset) {
-    if(x!=inset && x!=size-inset-1 && y!=inset && y!=size-inset-1) continue
-    val c=pixels[y*size+x]
-    if(android.graphics.Color.alpha(c)>=220) edgeColors.add(c)
-   }
-   if(edgeColors.size>=20) break
-  }
- }
- fun distance(a:Int,b:Int):Int {
-  val dr=android.graphics.Color.red(a)-android.graphics.Color.red(b)
-  val dg=android.graphics.Color.green(a)-android.graphics.Color.green(b)
-  val db=android.graphics.Color.blue(a)-android.graphics.Color.blue(b)
-  return dr*dr+dg*dg+db*db
- }
- // Choose the most common edge color cluster, not the most common color
- // across the whole icon (which might belong to the logo).
- val background=edgeColors.maxByOrNull { candidate ->
-  edgeColors.count { distance(candidate,it)<=28*28*3 }
- }
- if(background==null) {
-  // Already transparent artwork: keep the visible shape and make it white.
-  for(i in pixels.indices) {
-   val alpha=android.graphics.Color.alpha(pixels[i])
-   pixels[i]=(alpha shl 24) or 0x00FFFFFF
-  }
- } else {
-  val visited=BooleanArray(pixels.size)
-  val queue=IntArray(pixels.size)
-  var head=0
-  var tail=0
-  fun enqueue(index:Int) {
-   if(visited[index]) return
-   val c=pixels[index]
-   if(android.graphics.Color.alpha(c)<48 || distance(c,background)>42*42*3) return
-   visited[index]=true
-   queue[tail++]=index
-  }
-  // Flood-fill only connected background pixels, keeping same-colored
-  // enclosed parts of the symbol intact.
-  for(x in 0 until size) { enqueue(x);enqueue((size-1)*size+x) }
-  for(y in 0 until size) { enqueue(y*size);enqueue(y*size+size-1) }
-  // For rounded icons with transparent corners, begin at opaque edge pixels
-  // within the outer band as well.
-  for(y in 0 until size) for(x in 0 until size) {
-   if(x<12 || y<12 || x>=size-12 || y>=size-12) enqueue(y*size+x)
-  }
-  while(head<tail) {
-   val i=queue[head++]
-   val x=i%size
-   val y=i/size
-   if(x>0) enqueue(i-1)
-   if(x<size-1) enqueue(i+1)
-   if(y>0) enqueue(i-size)
-   if(y<size-1) enqueue(i+size)
-  }
-  for(i in pixels.indices) {
-   val alpha=android.graphics.Color.alpha(pixels[i])
-   if(alpha==0) continue
-   val rgb=if(visited[i]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-   pixels[i]=(alpha shl 24) or (rgb and 0x00FFFFFF)
-  }
- }
- bitmap.setPixels(pixels,0,size,0,0,size,size)
  return bitmap.asImageBitmap()
 }
 
