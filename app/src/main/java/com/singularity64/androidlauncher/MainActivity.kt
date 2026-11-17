@@ -164,6 +164,7 @@ class MainActivity : ComponentActivity() {
      homeRevision++
      drawer=false;search=""
     }
+    var showPreviewGuide by remember { mutableStateOf(false) }
     BackHandler(enabled=true) {
      when {
       showPreviewGuide -> showPreviewGuide=false
@@ -176,7 +177,6 @@ class MainActivity : ComponentActivity() {
     var usageRevision by remember { mutableIntStateOf(0) }
     var adaptiveEnabled by remember { mutableStateOf(prefs.getBoolean("adaptive_enabled",true)) }
     var accessRevision by remember { mutableIntStateOf(0) }
-     var showPreviewGuide by remember { mutableStateOf(false) }
     val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
      val observer=androidx.lifecycle.LifecycleEventObserver { _,event -> if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) accessRevision++ }
