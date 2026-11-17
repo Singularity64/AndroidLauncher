@@ -91,8 +91,7 @@ private fun adaptiveScores(context:Context,packages:List<String>):Map<String,Dou
    else -> 0.35
   } * (if(ageDays>21) 0.65 else 1.0)
   val minutes=item.totalTimeInForeground/60000.0
-  val launches=item.appLaunchCount.coerceAtLeast(0)
-  val contribution=(ln(1.0+minutes)*0.65 + ln(1.0+launches.toDouble())*0.35)*weight
+  val contribution=ln(1.0+minutes)*weight
   scores[item.packageName]=(scores[item.packageName]?:0.0)+contribution
  }
  return scores
