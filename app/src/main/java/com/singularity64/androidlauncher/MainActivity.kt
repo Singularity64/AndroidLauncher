@@ -353,6 +353,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   if(expanded) content()
  }
 }
+@OptIn(ExperimentalFoundationApi::class)
 @Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false,glass:Boolean=false,onPin:((String)->Unit)?=null) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) {
