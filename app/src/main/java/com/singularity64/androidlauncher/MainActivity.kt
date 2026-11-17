@@ -504,7 +504,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   ) {
    gridItems(orderedTiles,span={ tile -> androidx.compose.foundation.lazy.grid.GridItemSpan(sizes[tile.id]?:tile.defaultSpan) },key={it.id}) { tile ->
     val span=sizes[tile.id]?:tile.defaultSpan
-    val height=heights[tile.id]?:tile.defaultHeight
+    val height=(heights[tile.id]?:tile.defaultHeight).coerceAtLeast(if(hideLabels) 82 else 108)
     var menu by remember { mutableStateOf(false) }
     Box(Modifier.onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot() }
      .graphicsLayer {
@@ -559,7 +559,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
       listOf(1 to "Malá (1/4)",2 to "Střední (1/2)",4 to "Velká (celá šířka)").forEach { (newSpan,title) ->
        DropdownMenuItem(text={Text(title)},onClick={
         sizes[tile.id]=newSpan
-        val newHeight=when(newSpan) { 1 -> 72; 2 -> tile.defaultHeight.coerceAtLeast(112); else -> tile.defaultHeight.coerceAtLeast(118) }
+        val newHeight=when(newSpan) { 1 -> 108; 2 -> tile.defaultHeight.coerceAtLeast(112); else -> tile.defaultHeight.coerceAtLeast(118) }
         heights[tile.id]=newHeight
         prefs.edit().putInt("span_"+tile.id,newSpan).putInt("height_"+tile.id,newHeight).apply()
         menu=false
@@ -585,8 +585,8 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
 @Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
  val glassShape=RoundedCornerShape(24.dp)
  Box(modifier
-  .background(Brush.linearGradient(listOf(start.copy(alpha=0.34f),Color(0xFF11172D).copy(alpha=0.79f),end.copy(alpha=0.34f))),glassShape)
-  .border(1.dp,Brush.linearGradient(listOf(Color.White.copy(alpha=0.67f),start.copy(alpha=0.75f),end.copy(alpha=0.78f))),glassShape)
+  .background(Brush.linearGradient(listOf(Color(0xFF1C3558).copy(alpha=0.88f),Color(0xFF1C1B38).copy(alpha=0.93f),Color(0xFF272044).copy(alpha=0.88f))),glassShape)
+  .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB6DAFF).copy(alpha=0.72f),Color(0xFF7D82C7).copy(alpha=0.48f),Color(0xFFAE80E9).copy(alpha=0.65f))),glassShape)
   .combinedClickable(onClick=click,onLongClick=onLongClick).padding(12.dp)) {
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
@@ -598,9 +598,9 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
      try { monochromeIcon(context.packageManager.getApplicationIcon(pkg)) } catch (_:Exception) { null }
     }
    }
-   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(32.dp))
-   else Text(symbol,color=Color.White,fontSize=29.sp)
-   if(!hideLabel) { Spacer(Modifier.height(9.dp));Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp) }
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(36.dp))
+   else Text(symbol,color=Color.White,fontSize=30.sp)
+   if(!hideLabel) { Spacer(Modifier.height(7.dp));Text(label,color=Color.White,fontSize=11.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center) }
   }
  }
 }
