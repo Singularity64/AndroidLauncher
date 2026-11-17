@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -31,8 +32,6 @@ import android.os.Process
 import android.provider.Settings
 import java.util.Calendar
 import kotlin.math.ln
-import kotlin.math.cos
-import kotlin.math.sin
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.material.icons.Icons
@@ -53,7 +52,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -146,8 +144,6 @@ class MainActivity : ComponentActivity() {
     val homePrefs=remember { getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
     var homeRevision by remember { mutableIntStateOf(0) }
     var hideHomeLabels by remember { mutableStateOf(homePrefs.getBoolean("hide_home_labels",false)) }
-    var abcSearchEnabled by remember { mutableStateOf(homePrefs.getBoolean("abc_search_enabled",false)) }
-    var abcWheelOpen by remember { mutableStateOf(false) }
     var showLauncherSettings by remember { mutableStateOf(false) }
     var dimOtherTiles by remember { mutableStateOf(homePrefs.getBoolean("dim_other_tiles",false)) }
     var showNotificationAppPicker by remember { mutableStateOf(false) }
@@ -239,6 +235,7 @@ class MainActivity : ComponentActivity() {
         .thenBy { it.loadLabel(packageManager).toString() }).take(8)
      }
      val filtered=apps.filter { it.loadLabel(packageManager).toString().startsWith(search,ignoreCase=true) }
+     Box(Modifier.fillMaxSize()) {
      Column(Modifier.fillMaxSize().background(Color.Transparent).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
       Row(Modifier.fillMaxWidth().padding(bottom=12.dp),verticalAlignment=Alignment.CenterVertically,
        horizontalArrangement=Arrangement.SpaceBetween) {
@@ -256,7 +253,7 @@ class MainActivity : ComponentActivity() {
         Text("✦ Smart",color=if(smartMode) Color.White else Color.LightGray,
          fontSize=13.sp,fontWeight=FontWeight.Medium,
          modifier=Modifier.background(if(smartMode) Color(0xFF40434D) else Color.Transparent,RoundedCornerShape(20.dp))
-          .clickable { smartMode=true;abcWheelOpen=false;prefs.edit().putBoolean("smart_mode",true).apply() }
+          .clickable { smartMode=true;prefs.edit().putBoolean("smart_mode",true).apply() }
           .padding(horizontal=13.dp,vertical=9.dp))
        }
        }
@@ -282,31 +279,28 @@ class MainActivity : ComponentActivity() {
       }.sortedWith(compareByDescending<Pair<String,List<ResolveInfo>>> { group ->
        group.second.maxOfOrNull { appUsageRank(it) } ?: 0.0
       }.thenByDescending { group -> group.second.sumOf { appUsageRank(it) } }.thenBy { it.first })
-      val alphabeticalApps=remember(filtered) { filtered.sortedWith(compareBy<ResolveInfo> {
-       it.loadLabel(packageManager).toString().lowercase(Locale.getDefault())
-      }.thenBy { it.activityInfo.packageName }) }
-      val abcRows=alphabeticalApps.chunked(4)
-      val appListState=androidx.compose.foundation.lazy.rememberLazyListState()
-      val abcScope=rememberCoroutineScope()
-      Box(Modifier.fillMaxSize()) {
-      LazyColumn(state=appListState,modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp),
+      LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp),
        contentPadding=PaddingValues(bottom=20.dp)) {
        if(!smartMode) {
-        item(key="alphabetical_header") {
-         Row(Modifier.fillMaxWidth().background(Color(0xB817191E),RoundedCornerShape(16.dp)).padding(12.dp),
-          horizontalArrangement=Arrangement.SpaceBetween) {
-          Text("Všechny aplikace",color=Color.White,fontSize=16.sp,fontWeight=FontWeight.SemiBold)
-          Text("A–Z",color=Color.LightGray,fontSize=13.sp)
-         }
-        }
-        items(abcRows.size,key={ "abc_row_${it}" }) { rowIndex ->
-         Row(Modifier.fillMaxWidth().background(Color(0xB817191E),RoundedCornerShape(14.dp)).padding(6.dp),
-          horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-          val rowApps=abcRows[rowIndex]
-          rowApps.forEach { app -> Box(Modifier.weight(1f)) {
-           AppGridItem(app,packageManager,::launch,glass=true,onPin=::addToHome)
-          } }
-          repeat(4-rowApps.size) { Spacer(Modifier.weight(1f)) }
+        item(key="alphabetical_apps") {
+         val alphabetic=filtered.sortedWith(compareBy<ResolveInfo> {
+          it.loadLabel(packageManager).toString().lowercase(Locale.getDefault())
+         }.thenBy { it.activityInfo.packageName })
+         Column(Modifier.fillMaxWidth().background(Color(0xB817191E),RoundedCornerShape(20.dp))
+          .border(1.dp,Color(0xFF424751),RoundedCornerShape(20.dp)).padding(12.dp),
+          verticalArrangement=Arrangement.spacedBy(10.dp)) {
+          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+           Text("Všechny aplikace",color=Color.White,fontSize=16.sp,fontWeight=FontWeight.SemiBold)
+           Text("A–Z",color=Color.LightGray,fontSize=13.sp)
+          }
+          alphabetic.chunked(4).forEach { rowApps ->
+           Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            rowApps.forEach { app -> Box(Modifier.weight(1f)) {
+             AppGridItem(app,packageManager,::launch,glass=true,onPin=::addToHome)
+            } }
+            repeat(4-rowApps.size) { Spacer(Modifier.weight(1f)) }
+           }
+          }
          }
         }
        } else {
@@ -344,34 +338,22 @@ class MainActivity : ComponentActivity() {
        }
        }
       }
-      if(abcSearchEnabled && !smartMode && search.isBlank()) {
-       Box(Modifier.align(Alignment.CenterEnd).offset(y=92.dp).size(48.dp)
-        .background(Color(0xD82B3348),RoundedCornerShape(24.dp))
-        .border(1.dp,Color(0xFF8CCBFF),RoundedCornerShape(24.dp))
-        .clickable { abcWheelOpen=!abcWheelOpen },contentAlignment=Alignment.Center) {
-        Text(if(abcWheelOpen) "×" else "A–Z",color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Bold)
-       }
-       if(abcWheelOpen) {
-        val letters=('A'..'Z').toList()
-        letters.forEachIndexed { index,letter ->
-         val angle=Math.PI * (0.5 + index.toDouble()/25.0)
-         val x=(cos(angle)*112.0-25.0).dp
-         val y=(sin(angle)*112.0+92.0).dp
-         Box(Modifier.align(Alignment.CenterEnd).offset(x=x,y=y).size(27.dp)
-          .background(Color(0xE32A334B),RoundedCornerShape(14.dp))
-          .clickable {
-           val target=alphabeticalApps.indexOfFirst {
-            it.loadLabel(packageManager).toString().uppercase(Locale.getDefault()).startsWith(letter.toString())
-           }
-           if(target>=0) abcScope.launch { appListState.animateScrollToItem(1+target/4) }
-           abcWheelOpen=false
-          },contentAlignment=Alignment.Center) {
-          Text(letter.toString(),color=Color.White,fontSize=11.sp)
-         }
-        }
-       }
-      }
-      }
+     }
+     // Explicit left-edge swipe fallback for devices that do not dispatch system Back to the launcher.
+     var backSwipeDistance by remember { mutableFloatStateOf(0f) }
+     Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(20.dp)
+      .pointerInput(Unit) {
+       detectHorizontalDragGestures(
+        onDragStart={backSwipeDistance=0f},
+        onHorizontalDrag={change,dragAmount ->
+         if(dragAmount>0f) backSwipeDistance+=dragAmount
+         else backSwipeDistance=(backSwipeDistance+dragAmount).coerceAtLeast(0f)
+         change.consume()
+        },
+        onDragEnd={if(backSwipeDistance>72f) { drawer=false;search="" };backSwipeDistance=0f},
+        onDragCancel={backSwipeDistance=0f}
+       )
+      })
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
       homeRevision=homeRevision,hideLabels=hideHomeLabels,dimOtherTiles=dimOtherTiles,priorityApps=priorityApps.toSet(),onTileRemoved={homeRevision++})
@@ -417,10 +399,6 @@ class MainActivity : ComponentActivity() {
      title={Text("Nastavení launcheru")},
      text={
       Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-        Text("ABC vyhledávání",modifier=Modifier.weight(1f))
-        Switch(checked=abcSearchEnabled,onCheckedChange={abcSearchEnabled=it;abcWheelOpen=false;homePrefs.edit().putBoolean("abc_search_enabled",it).apply()})
-       }
        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
         Text("Skrýt názvy dlaždic na ploše",modifier=Modifier.weight(1f))
         Switch(checked=hideHomeLabels,onCheckedChange={hideHomeLabels=it;homePrefs.edit().putBoolean("hide_home_labels",it).apply()})
