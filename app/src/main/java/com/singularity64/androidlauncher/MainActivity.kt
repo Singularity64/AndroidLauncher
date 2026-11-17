@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
      try {
       startActivity(intent)
       val day=today()
-      if(prefs.getString("usage_day","") != day) prefs.edit().clear().putString("usage_day",day).putBoolean("show_frequent",showFrequent).apply()
+      if(prefs.getString("usage_day","") != day) prefs.edit().apply { prefs.all.keys.filter { it.startsWith("count_") }.forEach { remove(it) }; putString("usage_day",day); putBoolean("show_frequent",showFrequent) }.apply()
       prefs.edit().putInt("count_$pkg",prefs.getInt("count_$pkg",0)+1).putInt("week_${day}_$pkg",prefs.getInt("week_${day}_$pkg",0)+1).apply()
       usageRevision++
      } catch (_:Exception) { }
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
     } else if(drawer) {
      val day=today()
      if(prefs.getString("usage_day","") != day) {
-      prefs.edit().clear().putString("usage_day",day).putBoolean("show_frequent",showFrequent).apply()
+      prefs.edit().apply { prefs.all.keys.filter { it.startsWith("count_") }.forEach { remove(it) }; putString("usage_day",day); putBoolean("show_frequent",showFrequent) }.apply()
      }
      val revision=usageRevision
      val popular=remember(revision,day,apps) {
