@@ -35,7 +35,11 @@ jobs:
       - name: Show signing certificate fingerprint
         run: keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep SHA256
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        env:
+          LAUNCHER_SIGNING_STORE: ${{ runner.temp }}/launcher-signing.jks
+        run: |
+          cp ~/.android/debug.keystore "$LAUNCHER_SIGNING_STORE"
+          gradle :app:assembleDebug --stacktrace
       - name: Verify APK signing
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
