@@ -209,35 +209,7 @@ class MainActivity : ComponentActivity() {
        trailingIcon={if(search.isNotEmpty()) IconButton(onClick={search=""}) { Icon(Icons.Default.Close,contentDescription="Vymazat") }},
        shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF181818),unfocusedContainerColor=Color(0xFF181818),focusedBorderColor=Color.White,unfocusedBorderColor=Color.Transparent),
        modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp).padding(bottom=14.dp))
-      if(search.isBlank()) {
-       Row(Modifier.fillMaxWidth().clickable {
-        showFrequent=!showFrequent
-        prefs.edit().putBoolean("show_frequent",showFrequent).apply()
-       }.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically,
-        horizontalArrangement=Arrangement.SpaceBetween) {
-        Text("Nejčastěji používané aplikace",color=Color.White,fontSize=15.sp)
-        Text(if(showFrequent) "⌃" else "⌄",color=Color.White,fontSize=22.sp)
-       }
-       if(adaptiveEnabled && !usageAccess(this@MainActivity)) {
-        Text("Pro automatické řazení povol přístup k údajům o používání.",color=Color.LightGray,fontSize=12.sp)
-        Text("Povolit přístup",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(vertical=8.dp))
-       }
-      }
-      if(showFrequent && search.isBlank()) {
-       if(popular.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray,fontSize=12.sp,modifier=Modifier.padding(bottom=10.dp))
-       else {
-        Column(Modifier.padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-         popular.chunked(4).forEach { group ->
-          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-           group.forEach { app ->
-            Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch) }
-           }
-           repeat(4-group.size) { Spacer(Modifier.weight(1f)) }
-          }
-         }
-        }
-       }
-      }
+      val collapsed=remember { mutableStateMapOf<String,Boolean>() }
       val rankedApps=filtered.sortedWith(compareByDescending<ResolveInfo> {
        (scores[it.activityInfo.packageName]?:0.0)+ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5
       }.thenBy { it.loadLabel(packageManager).toString() })
@@ -245,21 +217,36 @@ class MainActivity : ComponentActivity() {
        .sortedWith(compareByDescending<Pair<String,List<ResolveInfo>>> { group ->
         group.second.sumOf { (scores[it.activityInfo.packageName]?:0.0)+ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
        }.thenBy { it.first })
-      val collapsed=remember { mutableStateMapOf<String,Boolean>() }
-      LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-       grouped.forEach { (category,groupApps) ->
-        item(key="heading_$category") {
-         Row(Modifier.fillMaxWidth().clickable { collapsed[category]=collapsed[category]!=true }.padding(vertical=8.dp),
-          horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-          Text(category,color=Color.White,fontSize=17.sp,fontWeight=FontWeight.SemiBold)
-          Text(if(collapsed[category]==true) "⌄" else "⌃",color=Color.White,fontSize=20.sp)
+      LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp),
+       contentPadding=PaddingValues(bottom=20.dp)) {
+       if(search.isBlank()) {
+        item(key="frequent_glass") {
+         GlassAppSection("Nejčastěji používané aplikace",Color(0xFF6654C0),
+          Color(0xFF151328),showFrequent,{showFrequent=!showFrequent;prefs.edit().putBoolean("show_frequent",showFrequent).apply()}) {
+          if(adaptiveEnabled && !usageAccess(this@MainActivity)) {
+           Text("Pro automatické řazení povol přístup k údajům o používání.",color=Color.LightGray,fontSize=12.sp)
+           Text("Povolit přístup",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(vertical=8.dp))
+          }
+          if(popular.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray,fontSize=12.sp)
+          else popular.chunked(4).forEach { rowApps ->
+           Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch,glass=true) } }
+            repeat(4-rowApps.size) { Spacer(Modifier.weight(1f)) }
+           }
+          }
          }
         }
-        if(collapsed[category]!=true) {
-         items(groupApps.chunked(5)) { rowApps ->
-          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)) {
-           rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch) } }
-           repeat(5-rowApps.size) { Spacer(Modifier.weight(1f)) }
+       }
+       grouped.forEach { (category,groupApps) ->
+        item(key="glass_$category") {
+         val (accent,tint)=glassColors(category)
+         GlassAppSection(category,accent,tint,collapsed[category]!=true,
+          {collapsed[category]=collapsed[category]!=true}) {
+          groupApps.chunked(5).forEach { rowApps ->
+           Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)) {
+            rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch,glass=true) } }
+            repeat(5-rowApps.size) { Spacer(Modifier.weight(1f)) }
+           }
           }
          }
         }
@@ -288,7 +275,36 @@ class MainActivity : ComponentActivity() {
    overflow=TextOverflow.Ellipsis)
  }
 }
-@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false) {
+private fun glassColors(category:String):Pair<Color,Color> = when(category) {
+ "Bankovnictví a finance" -> Color(0xFF258D84) to Color(0xFF0C2020)
+ "Doprava a mapy" -> Color(0xFF347AC2) to Color(0xFF101D32)
+ "Práce a produktivita" -> Color(0xFFD58C39) to Color(0xFF292015)
+ "Zábava a média" -> Color(0xFFB74C64) to Color(0xFF28151E)
+ "Fotografie" -> Color(0xFFC05DA3) to Color(0xFF281725)
+ "Sociální sítě" -> Color(0xFF8461C7) to Color(0xFF21182F)
+ "Internet" -> Color(0xFF4D91C2) to Color(0xFF14232E)
+ "Hry" -> Color(0xFF5BA96C) to Color(0xFF15251B)
+ else -> Color(0xFF64748B) to Color(0xFF1A2029)
+}
+@Composable private fun GlassAppSection(
+ title:String,accent:Color,tint:Color,expanded:Boolean,onToggle:()->Unit,
+ content:@Composable ColumnScope.()->Unit
+) {
+ Column(Modifier.fillMaxWidth()
+  .background(Brush.verticalGradient(listOf(tint.copy(alpha=0.94f),tint.copy(alpha=0.72f))),RoundedCornerShape(20.dp))
+  .border(1.dp,accent.copy(alpha=0.78f),RoundedCornerShape(20.dp))
+  .padding(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+  Row(Modifier.fillMaxWidth().clickable(onClick=onToggle).padding(vertical=3.dp),
+   verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+   Text(title,color=accent.copy(alpha=1f).let { Color(
+    (it.red*0.48f+0.52f),(it.green*0.48f+0.52f),(it.blue*0.48f+0.52f),1f) },
+    fontSize=15.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
+   Text(if(expanded) "⌃" else "⌄",color=Color.White,fontSize=21.sp)
+  }
+  if(expanded) content()
+ }
+}
+@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false,glass:Boolean=false) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) {
   try {
@@ -296,7 +312,7 @@ class MainActivity : ComponentActivity() {
    monochromeIcon(drawable)
   } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.background(Color.Black,RoundedCornerShape(15.dp)).padding(horizontal=4.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
+ Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
