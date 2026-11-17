@@ -122,6 +122,7 @@ class MainActivity : ComponentActivity() {
     var drawer by remember { mutableStateOf(false) }
     var multitask by remember { mutableStateOf(false) }
     var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",false)) }
+    var smartMode by remember { mutableStateOf(prefs.getBoolean("smart_mode",true)) }
     var search by remember { mutableStateOf("") }
     BackHandler(enabled=true) {
      when {
@@ -203,7 +204,24 @@ class MainActivity : ComponentActivity() {
      }
      val filtered=apps.filter { it.loadLabel(packageManager).toString().startsWith(search,ignoreCase=true) }
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
-      Text("‹  Aplikace",color=Color.White,fontSize=26.sp,modifier=Modifier.clickable { drawer=false }.padding(bottom=12.dp))
+      Row(Modifier.fillMaxWidth().padding(bottom=12.dp),verticalAlignment=Alignment.CenterVertically,
+       horizontalArrangement=Arrangement.SpaceBetween) {
+       Text("‹ Aplikace",color=Color.White,fontSize=26.sp,
+        modifier=Modifier.clickable { drawer=false })
+       Row(Modifier.background(Color(0xFF1A1A1F),RoundedCornerShape(24.dp)).padding(3.dp),
+        horizontalArrangement=Arrangement.spacedBy(3.dp)) {
+        Text("A–Z",color=if(!smartMode) Color.White else Color.LightGray,
+         fontSize=13.sp,fontWeight=FontWeight.Medium,
+         modifier=Modifier.background(if(!smartMode) Color(0xFF40434D) else Color.Transparent,RoundedCornerShape(20.dp))
+          .clickable { smartMode=false;prefs.edit().putBoolean("smart_mode",false).apply() }
+          .padding(horizontal=13.dp,vertical=9.dp))
+        Text("✦ Smart",color=if(smartMode) Color.White else Color.LightGray,
+         fontSize=13.sp,fontWeight=FontWeight.Medium,
+         modifier=Modifier.background(if(smartMode) Color(0xFF40434D) else Color.Transparent,RoundedCornerShape(20.dp))
+          .clickable { smartMode=true;prefs.edit().putBoolean("smart_mode",true).apply() }
+          .padding(horizontal=13.dp,vertical=9.dp))
+       }
+      }
       OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
        leadingIcon={Icon(Icons.Default.Search,contentDescription=null)},
        trailingIcon={if(search.isNotEmpty()) IconButton(onClick={search=""}) { Icon(Icons.Default.Close,contentDescription="Vymazat") }},
@@ -219,6 +237,29 @@ class MainActivity : ComponentActivity() {
        }.thenBy { it.first })
       LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp),
        contentPadding=PaddingValues(bottom=20.dp)) {
+       if(!smartMode) {
+        item(key="alphabetical_apps") {
+         val alphabetic=filtered.sortedWith(compareBy<ResolveInfo> {
+          it.loadLabel(packageManager).toString().lowercase(Locale.getDefault())
+         }.thenBy { it.activityInfo.packageName })
+         Column(Modifier.fillMaxWidth().background(Color(0xFF17191E),RoundedCornerShape(20.dp))
+          .border(1.dp,Color(0xFF424751),RoundedCornerShape(20.dp)).padding(12.dp),
+          verticalArrangement=Arrangement.spacedBy(10.dp)) {
+          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+           Text("Všechny aplikace",color=Color.White,fontSize=16.sp,fontWeight=FontWeight.SemiBold)
+           Text("A–Z",color=Color.LightGray,fontSize=13.sp)
+          }
+          alphabetic.chunked(4).forEach { rowApps ->
+           Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            rowApps.forEach { app -> Box(Modifier.weight(1f)) {
+             AppGridItem(app,packageManager,::launch,glass=true)
+            } }
+            repeat(4-rowApps.size) { Spacer(Modifier.weight(1f)) }
+           }
+          }
+         }
+        }
+       } else {
        if(search.isBlank()) {
         item(key="frequent_glass") {
          GlassAppSection("Nejčastěji používané aplikace",Color(0xFF3FA86C),
@@ -250,6 +291,7 @@ class MainActivity : ComponentActivity() {
           }
          }
         }
+       }
        }
       }
      }
