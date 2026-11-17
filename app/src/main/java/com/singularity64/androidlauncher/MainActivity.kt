@@ -246,7 +246,30 @@ class MainActivity : ComponentActivity() {
         .thenBy { it.loadLabel(packageManager).toString() })
        .take(6)
      }
-     Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
+     // System Back is handled by BackHandler. Also allow a home swipe inside quick switch.
+     val quickSwitchDensity=androidx.compose.ui.platform.LocalDensity.current
+     val quickSwitchHomeSwipe=Modifier.pointerInput(Unit) {
+      awaitEachGesture {
+       val down=awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
+       val start=down.position
+       var last=start
+       var released=false
+       while(!released) {
+        val event=awaitPointerEvent(PointerEventPass.Initial)
+        val pointer=event.changes.firstOrNull { it.id==down.id }
+        if(pointer==null) released=true
+        else {
+         last=pointer.position
+         if(!pointer.pressed) released=true
+        }
+       }
+       val distance=with(quickSwitchDensity) { 90.dp.toPx() }
+       val bottomZone=with(quickSwitchDensity) { 110.dp.toPx() }
+       if(start.y>=size.height-bottomZone && start.y-last.y>distance &&
+        kotlin.math.abs(start.x-last.x)<(start.y-last.y)) multitask=false
+      }
+     }
+     Column(Modifier.fillMaxSize().then(quickSwitchHomeSwipe).background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za 2 minuty · uchování 10 minut",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       val previewEnabled=remember(accessRevision) {
@@ -690,7 +713,7 @@ private fun packWithPriority(
     }
    }.pointerInput(screenHeightPx) {
     detectVerticalDragGestures(
-     onDragStart={ offset -> gestureStartNearBottom=offset.y in (screenHeightPx-150.dp.toPx())..(screenHeightPx-60.dp.toPx());swipeDistance=0f;swipeStartedAt=android.os.SystemClock.uptimeMillis() },
+     onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f;swipeStartedAt=android.os.SystemClock.uptimeMillis() },
      onVerticalDrag={ change,amount -> if(gestureStartNearBottom && draggingTile==null) { swipeDistance+=amount;change.consume() } },
      onDragEnd={ if(gestureStartNearBottom && swipeDistance < -160.dp.toPx() && android.os.SystemClock.uptimeMillis()-swipeStartedAt>=450L) onMultitask();gestureStartNearBottom=false },
      onDragCancel={ gestureStartNearBottom=false }
