@@ -14,6 +14,9 @@ import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
@@ -47,6 +50,16 @@ private val blue = Color(0xFF075AAB)
 private val purple = Color(0xFF543083)
 private val green = Color(0xFF247B26)
 private val red = Color(0xFFAE2034)
+private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx.compose.ui.graphics.ImageBitmap {
+ val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+ val source=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+ drawable.setBounds(0,0,96,96)
+ drawable.draw(Canvas(source))
+ val matrix=ColorMatrix().apply { setSaturation(0f) }
+ Canvas(bitmap).drawBitmap(source,0f,0f,Paint(Paint.ANTI_ALIAS_FLAG).apply { colorFilter=ColorMatrixColorFilter(matrix) })
+ source.recycle()
+ return bitmap.asImageBitmap()
+}
 
 class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
@@ -156,10 +169,7 @@ class MainActivity : ComponentActivity() {
  val icon=remember(pkg) {
   try {
    val drawable=app.loadIcon(pm)
-   val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
-   drawable.setBounds(0,0,96,96)
-   drawable.draw(Canvas(bitmap))
-   bitmap.asImageBitmap()
+   monochromeIcon(drawable)
   } catch (_:Exception) { null }
  }
  Column(Modifier.fillMaxWidth().background(Color(0xFF263448),RoundedCornerShape(16.dp)).clickable { onLaunch(pkg) }.padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally) {
@@ -178,10 +188,7 @@ class MainActivity : ComponentActivity() {
  val icon=remember(pkg) {
   try {
    val drawable=app.loadIcon(pm)
-   val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
-   drawable.setBounds(0,0,96,96)
-   drawable.draw(Canvas(bitmap))
-   bitmap.asImageBitmap()
+   monochromeIcon(drawable)
   } catch (_:Exception) { null }
  }
  Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.background(Color(0xFF202A39),RoundedCornerShape(15.dp)).padding(horizontal=4.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
@@ -246,11 +253,7 @@ class MainActivity : ComponentActivity() {
     appPackage?.let { pkg ->
      try {
       val drawable = context.packageManager.getApplicationIcon(pkg)
-      val bitmap = Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
-      val canvas = Canvas(bitmap)
-      drawable.setBounds(0,0,96,96)
-      drawable.draw(canvas)
-      bitmap.asImageBitmap()
+      monochromeIcon(drawable)
      } catch (_: Exception) { null }
     }
    }
