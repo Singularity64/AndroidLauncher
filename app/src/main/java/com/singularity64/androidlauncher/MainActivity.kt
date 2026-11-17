@@ -233,6 +233,15 @@ class MainActivity : ComponentActivity() {
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za poslední 2 minuty",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
+      val previewEnabled=remember(accessRevision) {
+       (Settings.Secure.getString(contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: "")
+        .contains("$packageName/.LauncherPreviewService",ignoreCase=true)
+      }
+      if(!previewEnabled) Text("Zapnout náhledy aplikací (Přístupnost)",color=Color(0xFF8CCBFF),
+       fontSize=13.sp,modifier=Modifier.clickable {
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+       }.padding(bottom=12.dp))
+
       if(ranked.isEmpty()) Column { Text("Za poslední 2 minuty nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
       else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
@@ -442,18 +451,25 @@ class MainActivity : ComponentActivity() {
   try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
  }
  val shape=RoundedCornerShape(18.dp)
- Column(Modifier.fillMaxWidth().height(112.dp)
+ val preview=remember(pkg) { AppPreviewCache.get(pkg) }
+ Box(Modifier.fillMaxWidth().height(112.dp)
   .background(Brush.linearGradient(listOf(Color(0xFF3CAEE8).copy(alpha=0.52f),Color(0xFF102D58).copy(alpha=0.55f),Color(0xFFAE40D9).copy(alpha=0.48f))),shape)
   .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFFF044F7))),shape)
-  .clickable { onLaunch(pkg) }.padding(horizontal=8.dp,vertical=9.dp),
-  horizontalAlignment=Alignment.CenterHorizontally,
-  verticalArrangement=Arrangement.Center) {
-  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(48.dp))
-  else Text("▦",color=Color.White,fontSize=30.sp)
-  Spacer(Modifier.height(8.dp))
-  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
-   textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth(),
-   overflow=TextOverflow.Ellipsis)
+  .clickable { onLaunch(pkg) }) {
+  if(preview!=null) {
+   Image(bitmap=preview.asImageBitmap(),contentDescription="Poslední snímek aplikace",
+    contentScale=androidx.compose.ui.layout.ContentScale.Crop,modifier=Modifier.fillMaxSize())
+   Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.30f)))
+  }
+  Column(Modifier.fillMaxSize().padding(horizontal=8.dp,vertical=9.dp),
+   horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(48.dp))
+   else Text("▦",color=Color.White,fontSize=30.sp)
+   Spacer(Modifier.height(8.dp))
+   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
+    textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth(),
+    overflow=TextOverflow.Ellipsis)
+  }
  }
 }
 private fun glassColors(category:String):Pair<Color,Color> = when(category) {
