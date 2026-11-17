@@ -286,7 +286,7 @@ class MainActivity : ComponentActivity() {
        }.padding(bottom=12.dp))
 
       if(ranked.isEmpty()) Column { Text("Za posledních 10 minut nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
-      else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+      else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
      }
@@ -490,31 +490,28 @@ class MainActivity : ComponentActivity() {
 
 @Composable private fun MultitaskCard(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
  val pkg=app.activityInfo.packageName
- val icon=remember(pkg) { try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null } }
- val preview=remember(pkg) { AppPreviewCache.get(pkg) }
+ val icon=remember(pkg) {
+  try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
+ }
  val shape=RoundedCornerShape(18.dp)
- Column(Modifier.fillMaxWidth().height(142.dp)
-  .background(Color(0xFF171B24),shape)
-  .border(1.dp,Color(0xFF424957),shape)
-  .clickable { onLaunch(pkg) }.padding(5.dp)) {
-  Box(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF10131A),RoundedCornerShape(13.dp)),
-   contentAlignment=Alignment.Center) {
-   if(preview!=null) {
-    Image(bitmap=preview.asImageBitmap(),contentDescription="Poslední snímek aplikace",
-     contentScale=androidx.compose.ui.layout.ContentScale.Crop,modifier=Modifier.fillMaxSize())
-   } else {
-    if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(42.dp))
-    else Text("▦",color=Color.White,fontSize=28.sp)
-   }
+ val preview=remember(pkg) { AppPreviewCache.get(pkg) }
+ Box(Modifier.fillMaxWidth().height(112.dp)
+  .background(Brush.linearGradient(listOf(Color(0xFF3CAEE8).copy(alpha=0.52f),Color(0xFF102D58).copy(alpha=0.55f),Color(0xFFAE40D9).copy(alpha=0.48f))),shape)
+  .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFFF044F7))),shape)
+  .clickable { onLaunch(pkg) }) {
+  if(preview!=null) {
+   Image(bitmap=preview.asImageBitmap(),contentDescription="Poslední snímek aplikace",
+    contentScale=androidx.compose.ui.layout.ContentScale.Crop,modifier=Modifier.fillMaxSize())
+   Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.30f)))
   }
-  Row(Modifier.fillMaxWidth().height(32.dp).padding(horizontal=4.dp),
-   verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
-   if(preview!=null && icon!=null) {
-    Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(18.dp))
-    Spacer(Modifier.width(5.dp))
-   }
-   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=11.sp,maxLines=1,
-    overflow=TextOverflow.Ellipsis,textAlign=TextAlign.Center)
+  Column(Modifier.fillMaxSize().padding(horizontal=8.dp,vertical=9.dp),
+   horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(48.dp))
+   else Text("▦",color=Color.White,fontSize=30.sp)
+   Spacer(Modifier.height(8.dp))
+   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
+    textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth(),
+    overflow=TextOverflow.Ellipsis)
   }
  }
 }
