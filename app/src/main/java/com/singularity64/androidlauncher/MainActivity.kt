@@ -616,7 +616,7 @@ private fun packWithPriority(
   HomeTileSpec("multitask","Multitasking","▤",Color(0xFF273B52),Color(0xFF38617B),4,94),
   HomeTileSpec("music","Hudba","♫",purple,navy,4,118,"com.google.android.apps.youtube.music")
  )
- val hidden=prefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() }.toSet()
+ val hidden=prefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() && it!="apps" }.toSet()
  val pinned=prefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() && it in apps }
  (defaults+pinned.filter { pkg -> defaults.none { it.appPackage==pkg } }.map { pkg ->
   val label=try { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg,0)).toString() } catch (_:Exception) { pkg }
@@ -797,7 +797,7 @@ private fun packWithPriority(
       }
      
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
-      DropdownMenuItem(text={Text("Odebrat z plochy",color=Color(0xFFFF5252))},onClick={
+      if(tile.id!="apps") DropdownMenuItem(text={Text("Odebrat z plochy",color=Color(0xFFFF5252))},onClick={
        val hidden=prefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() }.toMutableSet()
        hidden.add(tile.id)
        val edit=prefs.edit().putString("hidden_tiles",hidden.joinToString("|"))
