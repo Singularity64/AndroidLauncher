@@ -124,6 +124,13 @@ class MainActivity : ComponentActivity() {
     var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",false)) }
     var smartMode by remember { mutableStateOf(prefs.getBoolean("smart_mode",true)) }
     var search by remember { mutableStateOf("") }
+    val homePrefs=remember { getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
+    var homeRevision by remember { mutableIntStateOf(0) }
+    fun addToHome(pkg:String) {
+     val pinned=homePrefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() }
+     if(pkg !in pinned) { homePrefs.edit().putString("pinned_apps",(pinned+pkg).joinToString("|")).apply();homeRevision++ }
+     drawer=false;search=""
+    }
     BackHandler(enabled=true) {
      when {
       multitask -> multitask=false
@@ -252,7 +259,7 @@ class MainActivity : ComponentActivity() {
           alphabetic.chunked(4).forEach { rowApps ->
            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             rowApps.forEach { app -> Box(Modifier.weight(1f)) {
-             AppGridItem(app,packageManager,::launch,glass=true)
+             AppGridItem(app,packageManager,::launch,glass=true,onPin=::addToHome)
             } }
             repeat(4-rowApps.size) { Spacer(Modifier.weight(1f)) }
            }
@@ -296,7 +303,7 @@ class MainActivity : ComponentActivity() {
       }
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
-      onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
+      homeRevision=homeRevision,onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
    }
   }
  }
@@ -346,7 +353,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   if(expanded) content()
  }
 }
-@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false,glass:Boolean=false) {
+@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false,glass:Boolean=false,onPin:((String)->Unit)?=null) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) {
   try {
@@ -354,24 +361,28 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    monochromeIcon(drawable)
   } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
+ var pinMenu by remember { mutableStateOf(false) }
+ Box {
+ Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).combinedClickable(onClick={onLaunch(pkg)},onLongClick={if(onPin!=null) pinMenu=true}),horizontalAlignment=Alignment.CenterHorizontally) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
  }
-}
-private data class HomeTileSpec(
+ if(onPin!=null) DropdownMenu(expanded=pinMenu,onDismissRequest={pinMenu=false}) {
+  DropdownMenuItem(text={Text("Přidat na plochu")},onClick={pinMenu=false;onPin(pkg)})
+ }
+}}private data class HomeTileSpec(
  val id:String,val label:String,val symbol:String,val start:Color,val end:Color,
  val defaultSpan:Int,val defaultHeight:Int,val appPackage:String?=null,val big:Boolean=false
 )
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
+@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,onSelfUninstall:()->Unit) {
  val context=LocalContext.current
  val prefs=remember { context.getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
  val time=remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
  val date=remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
- val tiles=remember(time,date) { listOf(
+ val tiles=remember(time,date,homeRevision) { val defaults=listOf(
   HomeTileSpec("clock","$time\n$date","◷",navy,purple,2,145,big=true),
   HomeTileSpec("mail","Pošta","✉",blue,Color(0xFF028AD6),2,145,"com.google.android.gm"),
   HomeTileSpec("weather","Počasí","☁",Color(0xFF244D81),blue,2,115),
@@ -385,7 +396,13 @@ private data class HomeTileSpec(
   HomeTileSpec("settings","Nastavení","⚙",Color(0xFF353945),Color(0xFF545A6B),1,72,"com.android.settings"),
   HomeTileSpec("multitask","Multitasking","▤",Color(0xFF273B52),Color(0xFF38617B),4,94),
   HomeTileSpec("music","Hudba","♫",purple,navy,4,118,"com.google.android.apps.youtube.music")
- ) }
+ )
+ val pinned=prefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() && it in apps }
+ defaults+pinned.filter { pkg -> defaults.none { it.appPackage==pkg } }.map { pkg ->
+  val label=try { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg,0)).toString() } catch (_:Exception) { pkg }
+  HomeTileSpec("pinned_$pkg",label,"▦",Color(0xFF263752),Color(0xFF365879),1,72,pkg)
+ }
+ }
  val sizes=remember { mutableStateMapOf<String,Int>().apply {
   tiles.forEach { put(it.id,prefs.getInt("span_"+it.id,it.defaultSpan).coerceIn(1,4)) }
  } }
