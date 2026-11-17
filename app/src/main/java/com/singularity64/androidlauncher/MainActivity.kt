@@ -592,17 +592,17 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
 }
 @OptIn(ExperimentalFoundationApi::class)
 @Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,compact:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
- val glassShape=RoundedCornerShape(24.dp)
+ val glassShape=RoundedCornerShape(if(compact) 16.dp else 20.dp)
  Box(modifier
   .background(Brush.linearGradient(listOf(
-   Color(0xFF268DE8).copy(alpha=0.43f),
-   Color(0xFF091B42).copy(alpha=0.43f),
-   Color(0xFF8B24D5).copy(alpha=0.37f)
+   Color(0xFF3CAEE8).copy(alpha=0.52f),
+   Color(0xFF102D58).copy(alpha=0.55f),
+   Color(0xFFAE40D9).copy(alpha=0.48f)
   )),glassShape)
-  .border(2.dp,Brush.linearGradient(listOf(
+  .border(1.dp,Brush.linearGradient(listOf(
    Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFF5977FF),Color(0xFFF044F7)
   )),glassShape)
-  .combinedClickable(onClick=click,onLongClick=onLongClick).padding(if(compact) 5.dp else 12.dp)) {
+  .clickable(onClick=click).padding(if(compact) 5.dp else 12.dp)) {
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
