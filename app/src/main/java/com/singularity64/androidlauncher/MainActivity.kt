@@ -515,12 +515,12 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
      }
      val dx=last.x-start.x
      val dy=last.y-start.y
-     if(dx < -75.dp.toPx() && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.25f) onApps()
+     if(draggingTile==null && dx < -75.dp.toPx() && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.25f) onApps()
     }
    }.pointerInput(screenHeightPx) {
     detectVerticalDragGestures(
      onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f },
-     onVerticalDrag={ change,amount -> if(gestureStartNearBottom) { swipeDistance+=amount;change.consume() } },
+     onVerticalDrag={ change,amount -> if(gestureStartNearBottom && draggingTile==null) { swipeDistance+=amount;change.consume() } },
      onDragEnd={ if(gestureStartNearBottom && swipeDistance < -75.dp.toPx()) onMultitask();gestureStartNearBottom=false },
      onDragCancel={ gestureStartNearBottom=false }
     )
@@ -548,8 +548,9 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
         dragDelta+=amount
        },
        onDragEnd={
+        if(dragDelta.getDistance() < 12.dp.toPx()) menu=true
         val origin=tileBounds[tile.id]
-        if(origin!=null) {
+        if(origin!=null && dragDelta.getDistance() >= 12.dp.toPx()) {
          val drop=origin.center+dragDelta
          val target=tileBounds.entries.firstOrNull { (id,rect) ->
           id!=tile.id && rect.contains(drop)
@@ -567,7 +568,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
      }) {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
       Modifier.fillMaxWidth().then(if(span==1) Modifier.aspectRatio(1f) else Modifier.height(height.dp)),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,compact=span==1,
-      onLongClick={menu=true}) {
+      onLongClick={}) {
        when(tile.id) {
         "apps" -> onApps()
         "multitask" -> onMultitask()
