@@ -1,4 +1,5 @@
 package com.singularity64.androidlauncher
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.content.Context
@@ -165,7 +166,8 @@ class MainActivity : ComponentActivity() {
     }
     BackHandler(enabled=true) {
      when {
-      showLauncherSettings -> showLauncherSettings=false
+      showPreviewGuide -> showPreviewGuide=false
+       showLauncherSettings -> showLauncherSettings=false
       multitask -> multitask=false
       drawer -> { drawer=false; search="" }
       else -> { /* Home screen: do not exit the launcher on Back */ }
@@ -174,6 +176,7 @@ class MainActivity : ComponentActivity() {
     var usageRevision by remember { mutableIntStateOf(0) }
     var adaptiveEnabled by remember { mutableStateOf(prefs.getBoolean("adaptive_enabled",true)) }
     var accessRevision by remember { mutableIntStateOf(0) }
+     var showPreviewGuide by remember { mutableStateOf(false) }
     val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
      val observer=androidx.lifecycle.LifecycleEventObserver { _,event -> if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) accessRevision++ }
@@ -243,7 +246,7 @@ class MainActivity : ComponentActivity() {
        }.padding(bottom=12.dp))
 
       if(ranked.isEmpty()) Column { Text("Za poslední 2 minuty nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
-      else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+      else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
      }
