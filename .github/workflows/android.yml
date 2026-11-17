@@ -40,7 +40,9 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
           KEY_FP=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | sed -n 's/.*SHA256: //p' | head -1)
-          APK_FP=$(keytool -printcert -jarfile app/build/outputs/apk/debug/app-debug.apk | sed -n 's/.*SHA256: //p' | head -1)
+          APK_FP=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)
+          KEY_FP=$(printf '%s' "$KEY_FP" | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          APK_FP=$(printf '%s' "$APK_FP" | tr -d ':' | tr '[:upper:]' '[:lower:]')
           if [ -z "$KEY_FP" ] || [ "$KEY_FP" != "$APK_FP" ]; then
             echo "::error::APK signature differs from permanent keystore"
             exit 1
