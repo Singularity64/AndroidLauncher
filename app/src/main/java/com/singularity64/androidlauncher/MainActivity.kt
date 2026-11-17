@@ -646,9 +646,6 @@ private fun packWithPriority(
      }
     }
    }
-
-    }
-   }
    Spacer(Modifier.height(10.dp))
    Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF283447),RoundedCornerShape(15.dp))
     .combinedClickable(onClick={},onLongClick=onSelfUninstall).padding(15.dp)) {
