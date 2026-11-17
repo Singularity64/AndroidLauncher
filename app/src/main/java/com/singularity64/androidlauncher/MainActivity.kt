@@ -197,33 +197,26 @@ class MainActivity : ComponentActivity() {
     }
     if(multitask) {
      val todayMs=System.currentTimeMillis()
-     val days=(0..6).map { offset -> SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date(todayMs-offset*86400000L)) }
-     // Prefer Android's actual foreground time, including launches outside this launcher.
-     // Keep locally recorded launches as a fallback when usage access is unavailable.
+     // Android usage stats for the last ten minutes, not the last seven days.
      val revision=usageRevision
      val access=accessRevision
      val ranked=remember(revision,access,apps) {
-      val actualUsage=if(usageAccess(this@MainActivity)) {
+      val usage=if(usageAccess(this@MainActivity)) {
        try {
         val manager=getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        manager.queryAndAggregateUsageStats(todayMs-7L*86400000L,todayMs)
+        manager.queryAndAggregateUsageStats(todayMs-600000L,todayMs)
          .mapValues { it.value.totalTimeInForeground }
-       } catch (_:Exception) { emptyMap<String,Long>() }
+      } catch (_:Exception) { emptyMap<String,Long>() }
       } else emptyMap<String,Long>()
-      apps.map { app ->
-       val pkg=app.activityInfo.packageName
-       val local=days.sumOf { d -> prefs.getInt("week_${d}_${pkg}",0) }
-       Triple(app,actualUsage[pkg]?:0L,local)
-      }.filter { it.second>0L || it.third>0 }
-       .sortedWith(compareByDescending<Triple<ResolveInfo,Long,Int>> { it.second }
-        .thenByDescending { it.third }
-        .thenBy { it.first.loadLabel(packageManager).toString() })
-       .map { it.first }.take(6)
+      apps.filter { (usage[it.activityInfo.packageName] ?: 0L)>0L }
+       .sortedWith(compareByDescending<ResolveInfo> { usage[it.activityInfo.packageName] ?: 0L }
+        .thenBy { it.loadLabel(packageManager).toString() })
+       .take(12)
      }
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
-      Text("6 nejpoužívanějších spuštěných aplikací za 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
-      if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
+      Text("Nejpoužívanější za posledních 10 minut",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
+      if(ranked.isEmpty()) Column { Text("Za posledních 10 minut nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
       else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
@@ -415,13 +408,13 @@ class MainActivity : ComponentActivity() {
   try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
  }
  val shape=RoundedCornerShape(18.dp)
- Column(Modifier.fillMaxWidth().height(92.dp)
+ Column(Modifier.fillMaxWidth().height(112.dp)
   .background(Brush.linearGradient(listOf(Color(0xFF3CAEE8).copy(alpha=0.52f),Color(0xFF102D58).copy(alpha=0.55f),Color(0xFFAE40D9).copy(alpha=0.48f))),shape)
   .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFFF044F7))),shape)
   .clickable { onLaunch(pkg) }.padding(horizontal=8.dp,vertical=9.dp),
   horizontalAlignment=Alignment.CenterHorizontally,
   verticalArrangement=Arrangement.spacedBy(8.dp)) {
-  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(36.dp))
+  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(48.dp))
   else Text("▦",color=Color.White,fontSize=30.sp)
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=12.sp,maxLines=1,
    overflow=TextOverflow.Ellipsis)
