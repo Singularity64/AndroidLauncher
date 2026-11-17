@@ -466,7 +466,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  } }
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
- BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
+ BoxWithConstraints(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF050B1C),Color(0xFF123E73),Color(0xFF24123E),Color(0xFF080E22)),start=Offset.Zero,end=Offset(900f,1900f)))) {
   val screenHeightPx=with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
   LazyVerticalGrid(
    columns=GridCells.Fixed(4),
@@ -583,12 +583,15 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
 }
 @OptIn(ExperimentalFoundationApi::class)
 @Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
- Box(modifier.background(Brush.linearGradient(listOf(start,end)),RoundedCornerShape(15.dp))
+ val glassShape=RoundedCornerShape(24.dp)
+ Box(modifier
+  .background(Brush.linearGradient(listOf(start.copy(alpha=0.34f),Color(0xFF11172D).copy(alpha=0.79f),end.copy(alpha=0.34f))),glassShape)
+  .border(1.dp,Brush.linearGradient(listOf(Color.White.copy(alpha=0.67f),start.copy(alpha=0.75f),end.copy(alpha=0.78f))),glassShape)
   .combinedClickable(onClick=click,onLongClick=onLongClick).padding(12.dp)) {
-  if(big && !hideLabel) Column(Modifier.align(Alignment.CenterStart)) {
+  if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
-  } else Column(Modifier.fillMaxSize(),verticalArrangement=if(hideLabel) Arrangement.Center else Arrangement.SpaceBetween,horizontalAlignment=Alignment.CenterHorizontally) {
+  } else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
    val context=LocalContext.current
    val icon=remember(appPackage) {
     appPackage?.let { pkg ->
@@ -597,7 +600,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    }
    if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(32.dp))
    else Text(symbol,color=Color.White,fontSize=29.sp)
-   if(!hideLabel) Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp)
+   if(!hideLabel) { Spacer(Modifier.height(9.dp));Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp) }
   }
  }
 }
