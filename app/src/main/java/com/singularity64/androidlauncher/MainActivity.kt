@@ -12,6 +12,12 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
+import android.app.AppOpsManager
+import android.app.usage.UsageStatsManager
+import android.os.Process
+import android.provider.Settings
+import java.util.Calendar
+import kotlin.math.ln
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
@@ -61,6 +67,36 @@ private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx
  return bitmap.asImageBitmap()
 }
 
+private fun usageAccess(context:Context):Boolean {
+ val ops=context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+ return ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,Process.myUid(),context.packageName)==AppOpsManager.MODE_ALLOWED
+}
+private fun adaptiveScores(context:Context,packages:List<String>):Map<String,Double> {
+ if(!usageAccess(context)) return emptyMap()
+ val now=System.currentTimeMillis()
+ val manager=context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+ val start=Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR,-35); set(Calendar.HOUR_OF_DAY,0);set(Calendar.MINUTE,0);set(Calendar.SECOND,0) }.timeInMillis
+ val todayDow=Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+ val stats=manager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY,start,now) ?: return emptyMap()
+ val scores=mutableMapOf<String,Double>()
+ val eligible=packages.toSet()
+ stats.forEach { item ->
+  if(item.packageName !in eligible || item.totalTimeInForeground<=0L) return@forEach
+  val ageDays=((now-item.firstTimeStamp)/86400000L).coerceAtLeast(0)
+  val day=Calendar.getInstance().apply { timeInMillis=item.firstTimeStamp }.get(Calendar.DAY_OF_WEEK)
+  val sameDay=day==todayDow
+  val weight=when {
+   ageDays==0L -> 2.2
+   sameDay -> 2.0
+   else -> 0.35
+  } * (if(ageDays>21) 0.65 else 1.0)
+  val minutes=item.totalTimeInForeground/60000.0
+  val launches=item.appLaunchCount.coerceAtLeast(0)
+  val contribution=(ln(1.0+minutes)*0.65 + ln(1.0+launches.toDouble())*0.35)*weight
+  scores[item.packageName]=(scores[item.packageName]?:0.0)+contribution
+ }
+ return scores
+}
 class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
@@ -79,6 +115,14 @@ class MainActivity : ComponentActivity() {
      }
     }
     var usageRevision by remember { mutableIntStateOf(0) }
+    var adaptiveEnabled by remember { mutableStateOf(prefs.getBoolean("adaptive_enabled",true)) }
+    var accessRevision by remember { mutableIntStateOf(0) }
+    val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+     val observer=androidx.lifecycle.LifecycleEventObserver { _,event -> if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) accessRevision++ }
+     lifecycleOwner.lifecycle.addObserver(observer)
+     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val apps = remember {
      packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0)
       .filter { it.activityInfo.packageName != packageName }
@@ -102,7 +146,7 @@ class MainActivity : ComponentActivity() {
      val ranked=apps.map { app -> app to days.sumOf { d -> prefs.getInt("week_${d}_${app.activityInfo.packageName}",0) } }
       .filter { it.second>0 }.sortedWith(compareByDescending<Pair<ResolveInfo,Int>> { it.second }.thenBy { it.first.loadLabel(packageManager).toString() }).map { it.first }
      val revision=usageRevision
-     Column(Modifier.fillMaxSize().background(bg).padding(16.dp)) {
+     Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
@@ -116,13 +160,14 @@ class MainActivity : ComponentActivity() {
       prefs.edit().apply { prefs.all.keys.filter { it.startsWith("count_") }.forEach { remove(it) }; putString("usage_day",day); putBoolean("show_frequent",showFrequent) }.apply()
      }
      val revision=usageRevision
-     val popular=remember(revision,day,apps) {
-      apps.filter { prefs.getInt("count_${it.activityInfo.packageName}",0)>0 }
-       .sortedWith(compareByDescending<ResolveInfo> { prefs.getInt("count_${it.activityInfo.packageName}",0) }
+     val scores=remember(revision,day,apps,accessRevision,adaptiveEnabled) { if(adaptiveEnabled) adaptiveScores(this@MainActivity,apps.map { it.activityInfo.packageName }) else emptyMap() }
+     val popular=remember(revision,day,apps,scores,adaptiveEnabled) {
+      apps.filter { (scores[it.activityInfo.packageName]?:0.0)>0.0 || prefs.getInt("count_${it.activityInfo.packageName}",0)>0 }
+       .sortedWith(compareByDescending<ResolveInfo> { (scores[it.activityInfo.packageName]?:0.0) + ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
         .thenBy { it.loadLabel(packageManager).toString() }).take(8)
      }
      val filtered=apps.filter { it.loadLabel(packageManager).toString().contains(search,ignoreCase=true) }
-     Column(Modifier.fillMaxSize().background(bg).padding(horizontal=12.dp,vertical=20.dp)) {
+     Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
       Text("‹  Aplikace",color=Color.White,fontSize=26.sp,modifier=Modifier.clickable { drawer=false }.padding(bottom=12.dp))
       OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
        leadingIcon={Icon(Icons.Default.Search,contentDescription=null)},
@@ -130,11 +175,21 @@ class MainActivity : ComponentActivity() {
        shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF283447),unfocusedContainerColor=Color(0xFF222C3B),focusedBorderColor=Color(0xFF6B94C4),unfocusedBorderColor=Color.Transparent),
        modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp).padding(bottom=14.dp))
       Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-       Text("Nejčastěji používané dnes",color=Color.White,fontSize=15.sp)
+       Text(if(adaptiveEnabled && scores.isNotEmpty()) "Chytrý výběr pro dnešek" else "Nejčastěji používané dnes",color=Color.White,fontSize=15.sp)
        Text(if(showFrequent) "Skrýt" else "Zobrazit",color=Color(0xFF8CCBFF),modifier=Modifier.clickable {
         showFrequent=!showFrequent
         prefs.edit().putBoolean("show_frequent",showFrequent).apply()
        })
+      }
+      if(search.isBlank()) {
+       Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+        Text("Adaptivní řazení",color=Color.LightGray,fontSize=12.sp)
+        Switch(checked=adaptiveEnabled,onCheckedChange={ adaptiveEnabled=it; prefs.edit().putBoolean("adaptive_enabled",it).apply() },modifier=Modifier.height(28.dp))
+       }
+       if(adaptiveEnabled && !usageAccess(this@MainActivity)) {
+        Text("Pro učení podle času a dnů povol přístup k údajům o používání.",color=Color.LightGray,fontSize=12.sp)
+        Text("Povolit přístup",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(vertical=8.dp))
+       }
       }
       if(showFrequent && search.isBlank()) {
        if(popular.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray,fontSize=12.sp,modifier=Modifier.padding(bottom=10.dp))
@@ -211,7 +266,7 @@ class MainActivity : ComponentActivity() {
     onVerticalDrag={ change,dragAmount -> if(gestureStartNearBottom) { swipeDistance+=dragAmount; change.consume() } },
     onDragEnd={ if(gestureStartNearBottom && swipeDistance < -75.dp.toPx()) onMultitask(); gestureStartNearBottom=false },
     onDragCancel={ gestureStartNearBottom=false })
-  }.verticalScroll(rememberScrollState()).padding(horizontal=10.dp, vertical=28.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
+  }.verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding().padding(horizontal=10.dp, vertical=12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
    Tile("$time\n$date", "◷", navy, purple, Modifier.weight(1f).height(145.dp), big=true) {}
    Tile("Pošta", "✉", blue, Color(0xFF028AD6), Modifier.weight(1f).height(145.dp), appPackage="com.google.android.gm") { onLaunch("com.google.android.gm") }
