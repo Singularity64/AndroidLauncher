@@ -511,6 +511,8 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    gridItems(orderedTiles,span={ tile -> androidx.compose.foundation.lazy.grid.GridItemSpan(sizes[tile.id]?:tile.defaultSpan) },key={it.id}) { tile ->
     val span=sizes[tile.id]?:tile.defaultSpan
     val height=(heights[tile.id]?:tile.defaultHeight).coerceAtLeast(if(hideLabels) 82 else 108)
+    val smallSide=(maxWidth-20.dp-30.dp)/4
+    val tileHeight=when(span) { 1 -> smallSide; 2 -> smallSide*2+10.dp; else -> height.dp }
     var menu by remember { mutableStateOf(false) }
     Box(Modifier.onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot() }
      .graphicsLayer {
@@ -547,7 +549,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
       )
      }) {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
-      Modifier.fillMaxWidth().then(if(span==1) Modifier.aspectRatio(1f) else Modifier.height(height.dp)),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,compact=span==1,
+      Modifier.fillMaxWidth().height(tileHeight),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,compact=span==1,
       onLongClick={}) {
        when(tile.id) {
         "apps" -> onApps()
@@ -593,16 +595,24 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val glassShape=RoundedCornerShape(24.dp)
  Box(modifier
   .background(Brush.linearGradient(listOf(
-   Color(0xFF5A9DE2).copy(alpha=0.29f),
-   Color(0xFF182D53).copy(alpha=0.38f),
-   Color(0xFF7146AD).copy(alpha=0.27f)
+   Color(0xFF268DE8).copy(alpha=0.43f),
+   Color(0xFF091B42).copy(alpha=0.43f),
+   Color(0xFF8B24D5).copy(alpha=0.37f)
   )),glassShape)
-  .border(1.2.dp,Brush.linearGradient(listOf(
-   Color(0xFFD4F2FF).copy(alpha=0.90f),
-   Color(0xFF54B7FF).copy(alpha=0.70f),
-   Color(0xFFCE7EFF).copy(alpha=0.86f)
+  .border(2.dp,Brush.linearGradient(listOf(
+   Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFF5977FF),Color(0xFFF044F7)
   )),glassShape)
   .combinedClickable(onClick=click,onLongClick=onLongClick).padding(if(compact) 5.dp else 12.dp)) {
+  Box(Modifier.matchParentSize().background(
+   Brush.linearGradient(listOf(
+    Color.White.copy(alpha=0.24f),
+    Color(0xFF58D7FF).copy(alpha=0.09f),
+    Color.Transparent,
+    Color(0xFFDB4CFF).copy(alpha=0.14f)
+   ),start=Offset.Zero,end=Offset(760f,940f)),glassShape))
+  Box(Modifier.matchParentSize().border(1.dp,
+   Brush.linearGradient(listOf(Color.White.copy(alpha=0.65f),Color.Transparent,Color(0xFFFFA8FC).copy(alpha=0.68f))),
+   glassShape))
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
