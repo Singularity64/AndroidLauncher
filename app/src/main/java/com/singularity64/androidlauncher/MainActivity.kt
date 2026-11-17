@@ -156,9 +156,28 @@ class MainActivity : ComponentActivity() {
     if(multitask) {
      val todayMs=System.currentTimeMillis()
      val days=(0..6).map { offset -> SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date(todayMs-offset*86400000L)) }
-     val ranked=apps.map { app -> app to days.sumOf { d -> prefs.getInt("week_${d}_${app.activityInfo.packageName}",0) } }
-      .filter { it.second>0 }.sortedWith(compareByDescending<Pair<ResolveInfo,Int>> { it.second }.thenBy { it.first.loadLabel(packageManager).toString() }).map { it.first }
+     // Prefer Android's actual foreground time, including launches outside this launcher.
+     // Keep locally recorded launches as a fallback when usage access is unavailable.
      val revision=usageRevision
+     val access=accessRevision
+     val ranked=remember(revision,access,apps) {
+      val actualUsage=if(usageAccess(this@MainActivity)) {
+       try {
+        val manager=getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        manager.queryAndAggregateUsageStats(todayMs-7L*86400000L,todayMs)
+         .mapValues { it.value.totalTimeInForeground }
+       } catch (_:Exception) { emptyMap<String,Long>() }
+      } else emptyMap<String,Long>()
+      apps.map { app ->
+       val pkg=app.activityInfo.packageName
+       val local=days.sumOf { d -> prefs.getInt("week_${d}_${pkg}",0) }
+       Triple(app,actualUsage[pkg]?:0L,local)
+      }.filter { it.second>0L || it.third>0 }
+       .sortedWith(compareByDescending<Triple<ResolveInfo,Long,Int>> { it.second }
+        .thenByDescending { it.third }
+        .thenBy { it.first.loadLabel(packageManager).toString() })
+       .map { it.first }
+     }
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
