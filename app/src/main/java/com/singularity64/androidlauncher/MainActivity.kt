@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
@@ -333,11 +334,19 @@ private data class HomeTileSpec(
  } }
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
+ var horizontalSwipe by remember { mutableFloatStateOf(0f) }
  BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
   val screenHeightPx=with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
   LazyVerticalGrid(
    columns=GridCells.Fixed(4),
-   modifier=Modifier.fillMaxSize().pointerInput(screenHeightPx) {
+   modifier=Modifier.fillMaxSize().pointerInput(Unit) {
+    detectHorizontalDragGestures(
+     onDragStart={ horizontalSwipe=0f },
+     onHorizontalDrag={ change,amount -> horizontalSwipe+=amount; if(amount<0f) change.consume() },
+     onDragEnd={ if(horizontalSwipe < -75.dp.toPx()) onApps(); horizontalSwipe=0f },
+     onDragCancel={ horizontalSwipe=0f }
+    )
+   }.pointerInput(screenHeightPx) {
     detectVerticalDragGestures(
      onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f },
      onVerticalDrag={ change,amount -> if(gestureStartNearBottom) { swipeDistance+=amount;change.consume() } },
