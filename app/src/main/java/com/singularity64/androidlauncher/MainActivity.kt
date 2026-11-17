@@ -208,7 +208,7 @@ class MainActivity : ComponentActivity() {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
-      else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+      else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
      }
@@ -347,8 +347,11 @@ class MainActivity : ComponentActivity() {
  val icon=remember(pkg) {
   try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().background(Color(0xFF1C1C1C),RoundedCornerShape(14.dp))
-  .clickable { onLaunch(pkg) }.padding(horizontal=8.dp,vertical=14.dp),
+ val shape=RoundedCornerShape(18.dp)
+ Column(Modifier.fillMaxWidth().height(92.dp)
+  .background(Brush.linearGradient(listOf(Color(0xFF3CAEE8).copy(alpha=0.52f),Color(0xFF102D58).copy(alpha=0.55f),Color(0xFFAE40D9).copy(alpha=0.48f))),shape)
+  .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB9F7FF),Color(0xFF18BFFF),Color(0xFFF044F7))),shape)
+  .clickable { onLaunch(pkg) }.padding(horizontal=8.dp,vertical=9.dp),
   horizontalAlignment=Alignment.CenterHorizontally,
   verticalArrangement=Arrangement.spacedBy(8.dp)) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(36.dp))
@@ -501,7 +504,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
     detectVerticalDragGestures(
      onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f },
      onVerticalDrag={ change,amount -> if(gestureStartNearBottom && draggingTile==null) { swipeDistance+=amount;change.consume() } },
-     onDragEnd={ if(gestureStartNearBottom && swipeDistance < -75.dp.toPx()) onMultitask();gestureStartNearBottom=false },
+     onDragEnd={ if(gestureStartNearBottom && swipeDistance < -160.dp.toPx()) onMultitask();gestureStartNearBottom=false },
      onDragCancel={ gestureStartNearBottom=false }
     )
    }.statusBarsPadding().navigationBarsPadding().padding(horizontal=10.dp,vertical=12.dp),
