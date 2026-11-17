@@ -15,6 +15,10 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -140,6 +144,9 @@ class MainActivity : ComponentActivity() {
     var homeRevision by remember { mutableIntStateOf(0) }
     var hideHomeLabels by remember { mutableStateOf(homePrefs.getBoolean("hide_home_labels",false)) }
     var showLauncherSettings by remember { mutableStateOf(false) }
+    var dimOtherTiles by remember { mutableStateOf(homePrefs.getBoolean("dim_other_tiles",false)) }
+    var showNotificationAppPicker by remember { mutableStateOf(false) }
+    val priorityApps=remember { mutableStateListOf<String>().apply { addAll(homePrefs.getString("priority_notification_apps","")!!.split("|").filter { it.isNotBlank() }) } }
     var showNotificationPermission by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
      val enabled=Settings.Secure.getString(contentResolver,"enabled_notification_listeners") ?: ""
@@ -177,6 +184,7 @@ class MainActivity : ComponentActivity() {
     }
     fun today(): String = SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date())
     fun launch(pkg:String) {
+     LauncherNotificationState.markViewed(pkg)
      val intent=packageManager.getLaunchIntentForPackage(pkg) ?: return
      try {
       startActivity(intent)
@@ -328,7 +336,7 @@ class MainActivity : ComponentActivity() {
       }
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
-      homeRevision=homeRevision,hideLabels=hideHomeLabels,onTileRemoved={homeRevision++})
+      homeRevision=homeRevision,hideLabels=hideHomeLabels,dimOtherTiles=dimOtherTiles,priorityApps=priorityApps.toSet(),onTileRemoved={homeRevision++})
     if(showNotificationPermission) AlertDialog(
      onDismissRequest={showNotificationPermission=false},
      title={Text("Oznámení na dlaždicích")},
@@ -336,17 +344,44 @@ class MainActivity : ComponentActivity() {
      confirmButton={TextButton(onClick={showNotificationPermission=false;startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}) { Text("Povolit") }},
      dismissButton={TextButton(onClick={showNotificationPermission=false}) { Text("Později") }}
     )
+    if(showNotificationAppPicker) AlertDialog(
+     onDismissRequest={showNotificationAppPicker=false},
+     title={Text("Vybrané aplikace")},
+     text={
+      Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState())) {
+       apps.forEach { app ->
+        val pkg=app.activityInfo.packageName
+        Row(Modifier.fillMaxWidth().clickable {
+         if(pkg in priorityApps) priorityApps.remove(pkg) else priorityApps.add(pkg)
+         homePrefs.edit().putString("priority_notification_apps",priorityApps.joinToString("|")).apply()
+        }.padding(vertical=3.dp),verticalAlignment=Alignment.CenterVertically) {
+         Checkbox(checked=pkg in priorityApps,onCheckedChange={ checked ->
+          if(checked) { if(pkg !in priorityApps) priorityApps.add(pkg) } else priorityApps.remove(pkg)
+          homePrefs.edit().putString("priority_notification_apps",priorityApps.joinToString("|")).apply()
+         })
+         Text(app.loadLabel(packageManager).toString(),fontSize=14.sp)
+        }
+       }
+      }
+     },
+     confirmButton={TextButton(onClick={showNotificationAppPicker=false}) { Text("Hotovo") }}
+    )
     if(showLauncherSettings) AlertDialog(
      onDismissRequest={showLauncherSettings=false},
      title={Text("Nastavení launcheru")},
      text={
-      Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
-       horizontalArrangement=Arrangement.SpaceBetween) {
-       Text("Skrýt názvy dlaždic na ploše",modifier=Modifier.weight(1f))
-       Switch(checked=hideHomeLabels,onCheckedChange={
-        hideHomeLabels=it
-        homePrefs.edit().putBoolean("hide_home_labels",it).apply()
-       })
+      Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+        Text("Skrýt názvy dlaždic na ploše",modifier=Modifier.weight(1f))
+        Switch(checked=hideHomeLabels,onCheckedChange={hideHomeLabels=it;homePrefs.edit().putBoolean("hide_home_labels",it).apply()})
+       }
+       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+        Text("Zesednout ostatní dlaždice při oznámení",modifier=Modifier.weight(1f))
+        Switch(checked=dimOtherTiles,onCheckedChange={dimOtherTiles=it;homePrefs.edit().putBoolean("dim_other_tiles",it).apply()})
+       }
+       if(dimOtherTiles) TextButton(onClick={showLauncherSettings=false;showNotificationAppPicker=true}) {
+        Text("Vybrat aplikace (${priorityApps.size})")
+       }
       }
      },
      confirmButton={TextButton(onClick={showLauncherSettings=false}) { Text("Hotovo") }}
@@ -455,7 +490,7 @@ private fun packWithPriority(
  return result.mapValues { (_,p) -> rowMap.getValue(p/4)*4+p%4 }
 }
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,hideLabels:Boolean,onTileRemoved:()->Unit) {
+@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,hideLabels:Boolean,dimOtherTiles:Boolean,priorityApps:Set<String>,onTileRemoved:()->Unit) {
  val context=LocalContext.current
  val prefs=remember { context.getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
  val time=remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
@@ -588,7 +623,16 @@ private fun packWithPriority(
      val cellW=step*span-gap
      val cellH=step*rows-gap
     var menu by remember { mutableStateOf(false) }
-    Box(Modifier.offset(x=cellX,y=cellY).width(cellW).height(cellH).onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot() }
+    val activePriority=dimOtherTiles && priorityApps.any { LauncherNotificationState.isUnseen(it) }
+    val dimThisTile=activePriority && (tile.appPackage==null || !LauncherNotificationState.isUnseen(tile.appPackage) || tile.appPackage !in priorityApps)
+    Box(Modifier.offset(x=cellX,y=cellY).width(cellW).height(cellH).then(
+     if(dimThisTile) Modifier.drawWithContent {
+      val paint=Paint().apply { colorFilter=ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
+      drawContext.canvas.saveLayer(Rect(Offset.Zero,size),paint)
+      drawContent()
+      drawContext.canvas.restore()
+     } else Modifier
+    ).onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot() }
      .graphicsLayer {
       if(draggingTile==tile.id) {
        translationX=dragDelta.x
