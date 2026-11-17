@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
    Tile("Galerie", "▧", green, Color(0xFF39A927), Modifier.weight(1f).height(115.dp)) { onLaunch("com.google.android.apps.photos") }
   }
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("Aplikace", "▦", navy, Color(0xFF00B9DC), Modifier.weight(1f).height(116.dp), onApps)
+   Tile("Aplikace", "▦", navy, Color(0xFF00B9DC), Modifier.weight(1f).height(116.dp), click=onApps)
    Tile("YouTube", "▶", red, Color(0xFFED3038), Modifier.weight(1f).height(116.dp)) { onLaunch("com.google.android.youtube") }
   }
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
