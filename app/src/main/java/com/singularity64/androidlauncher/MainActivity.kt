@@ -458,6 +458,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val tileBounds=remember { mutableStateMapOf<String,Rect>() }
  var draggingTile by remember { mutableStateOf<String?>(null) }
  var dragDelta by remember { mutableStateOf(Offset.Zero) }
+ var dragOrigin by remember { mutableStateOf<Offset?>(null) }
  fun moveTile(id:String,delta:Int) {
   val from=orderedIds.indexOf(id)
   if(from<0) return
@@ -527,28 +528,29 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
       }
      }.pointerInput(tile.id) {
       detectDragGesturesAfterLongPress(
-       onDragStart={ draggingTile=tile.id;dragDelta=Offset.Zero },
+       onDragStart={ draggingTile=tile.id;dragDelta=Offset.Zero;dragOrigin=tileBounds[tile.id]?.center },
        onDrag={ change,amount ->
         change.consume()
         dragDelta+=amount
        },
        onDragEnd={
         if(dragDelta.getDistance() < 12.dp.toPx()) menu=true
-        val origin=tileBounds[tile.id]
+        val origin=dragOrigin
         if(origin!=null && dragDelta.getDistance() >= 12.dp.toPx()) {
-         val drop=origin.center+dragDelta
-         val target=tileBounds.entries.firstOrNull { (id,rect) ->
-          id!=tile.id && rect.contains(drop)
-         }?.key
+         // Use the ORIGINAL tile position. Its live bounds can move with graphicsLayer.
+         val drop=origin+dragDelta
+         val candidates=tileBounds.entries.filter { it.key!=tile.id }
+         val target=(candidates.firstOrNull { it.value.contains(drop) }
+          ?:candidates.minByOrNull { (_,rect) -> (rect.center-drop).getDistance() })?.key
          if(target!=null) {
           val from=orderedIds.indexOf(tile.id)
           val to=orderedIds.indexOf(target)
           if(from>=0 && to>=0) moveTile(tile.id,to-from)
          }
         }
-        draggingTile=null;dragDelta=Offset.Zero
+        draggingTile=null;dragDelta=Offset.Zero;dragOrigin=null
        },
-       onDragCancel={draggingTile=null;dragDelta=Offset.Zero}
+       onDragCancel={draggingTile=null;dragDelta=Offset.Zero;dragOrigin=null}
       )
      }) {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
