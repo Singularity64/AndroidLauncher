@@ -592,8 +592,16 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
 @Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,compact:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
  val glassShape=RoundedCornerShape(24.dp)
  Box(modifier
-  .background(Brush.linearGradient(listOf(Color(0xFF1C3558).copy(alpha=0.88f),Color(0xFF1C1B38).copy(alpha=0.93f),Color(0xFF272044).copy(alpha=0.88f))),glassShape)
-  .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB6DAFF).copy(alpha=0.72f),Color(0xFF7D82C7).copy(alpha=0.48f),Color(0xFFAE80E9).copy(alpha=0.65f))),glassShape)
+  .background(Brush.linearGradient(listOf(
+   Color(0xFF5A9DE2).copy(alpha=0.29f),
+   Color(0xFF182D53).copy(alpha=0.38f),
+   Color(0xFF7146AD).copy(alpha=0.27f)
+  )),glassShape)
+  .border(1.2.dp,Brush.linearGradient(listOf(
+   Color(0xFFD4F2FF).copy(alpha=0.90f),
+   Color(0xFF54B7FF).copy(alpha=0.70f),
+   Color(0xFFCE7EFF).copy(alpha=0.86f)
+  )),glassShape)
   .combinedClickable(onClick=click,onLongClick=onLongClick).padding(if(compact) 5.dp else 12.dp)) {
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
