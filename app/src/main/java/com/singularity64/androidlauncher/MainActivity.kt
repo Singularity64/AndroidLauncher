@@ -126,6 +126,8 @@ class MainActivity : ComponentActivity() {
     var search by remember { mutableStateOf("") }
     val homePrefs=remember { getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
     var homeRevision by remember { mutableIntStateOf(0) }
+    var hideHomeLabels by remember { mutableStateOf(homePrefs.getBoolean("hide_home_labels",false)) }
+    var showLauncherSettings by remember { mutableStateOf(false) }
     fun addToHome(pkg:String) {
      val pinned=homePrefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() }
      if(pkg !in pinned) { homePrefs.edit().putString("pinned_apps",(pinned+pkg).joinToString("|")).apply();homeRevision++ }
@@ -133,6 +135,7 @@ class MainActivity : ComponentActivity() {
     }
     BackHandler(enabled=true) {
      when {
+      showLauncherSettings -> showLauncherSettings=false
       multitask -> multitask=false
       drawer -> { drawer=false; search="" }
       else -> { /* Home screen: do not exit the launcher on Back */ }
@@ -215,6 +218,8 @@ class MainActivity : ComponentActivity() {
        horizontalArrangement=Arrangement.SpaceBetween) {
        Text("‹ Aplikace",color=Color.White,fontSize=26.sp,
         modifier=Modifier.clickable { drawer=false })
+       Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+       Text("⚙",color=Color.White,fontSize=24.sp,modifier=Modifier.clickable { showLauncherSettings=true }.padding(6.dp))
        Row(Modifier.background(Color(0xFF1A1A1F),RoundedCornerShape(24.dp)).padding(3.dp),
         horizontalArrangement=Arrangement.spacedBy(3.dp)) {
         Text("A–Z",color=if(!smartMode) Color.White else Color.LightGray,
@@ -227,6 +232,7 @@ class MainActivity : ComponentActivity() {
          modifier=Modifier.background(if(smartMode) Color(0xFF40434D) else Color.Transparent,RoundedCornerShape(20.dp))
           .clickable { smartMode=true;prefs.edit().putBoolean("smart_mode",true).apply() }
           .padding(horizontal=13.dp,vertical=9.dp))
+       }
        }
       }
       OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
@@ -303,7 +309,22 @@ class MainActivity : ComponentActivity() {
       }
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
-      homeRevision=homeRevision,onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
+      homeRevision=homeRevision,hideLabels=hideHomeLabels,onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
+    if(showLauncherSettings) AlertDialog(
+     onDismissRequest={showLauncherSettings=false},
+     title={Text("Nastavení launcheru")},
+     text={
+      Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
+       horizontalArrangement=Arrangement.SpaceBetween) {
+       Text("Skrýt názvy dlaždic na ploše",modifier=Modifier.weight(1f))
+       Switch(checked=hideHomeLabels,onCheckedChange={
+        hideHomeLabels=it
+        homePrefs.edit().putBoolean("hide_home_labels",it).apply()
+       })
+      }
+     },
+     confirmButton={TextButton(onClick={showLauncherSettings=false}) { Text("Hotovo") }}
+    )
    }
   }
  }
@@ -385,7 +406,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val defaultSpan:Int,val defaultHeight:Int,val appPackage:String?=null,val big:Boolean=false
 )
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,onSelfUninstall:()->Unit) {
+@Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,hideLabels:Boolean,onSelfUninstall:()->Unit) {
  val context=LocalContext.current
  val prefs=remember { context.getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
  val time=remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
@@ -478,7 +499,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
     var menu by remember { mutableStateOf(false) }
     Box {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
-      Modifier.fillMaxWidth().height(height.dp),big=tile.big,appPackage=tile.appPackage,
+      Modifier.fillMaxWidth().height(height.dp),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,
       onLongClick={menu=true}) {
        when(tile.id) {
         "apps" -> onApps()
@@ -519,13 +540,13 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  }
 }
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,onLongClick:()->Unit={},click:()->Unit) {
+@Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
  Box(modifier.background(Brush.linearGradient(listOf(start,end)),RoundedCornerShape(15.dp))
   .combinedClickable(onClick=click,onLongClick=onLongClick).padding(12.dp)) {
-  if(big) Column(Modifier.align(Alignment.CenterStart)) {
+  if(big && !hideLabel) Column(Modifier.align(Alignment.CenterStart)) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
-  } else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceBetween) {
+  } else Column(Modifier.fillMaxSize(),verticalArrangement=if(hideLabel) Arrangement.Center else Arrangement.SpaceBetween,horizontalAlignment=Alignment.CenterHorizontally) {
    val context=LocalContext.current
    val icon=remember(appPackage) {
     appPackage?.let { pkg ->
@@ -534,7 +555,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    }
    if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(32.dp))
    else Text(symbol,color=Color.White,fontSize=29.sp)
-   Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp)
+   if(!hideLabel) Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp)
   }
  }
 }
