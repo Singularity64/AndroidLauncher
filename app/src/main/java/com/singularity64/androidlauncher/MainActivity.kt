@@ -1,5 +1,14 @@
 package com.singularity64.androidlauncher
 import android.content.Intent
+import android.net.Uri
+import android.content.Context
+import android.content.pm.ResolveInfo
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -34,18 +43,102 @@ private val green = Color(0xFF247B26)
 private val red = Color(0xFFAE2034)
 
 class MainActivity : ComponentActivity() {
- override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState)
-  setContent { MaterialTheme(colorScheme = darkColorScheme(background = bg, surface = bg, onSurface = Color.White)) {
-   var drawer by remember { mutableStateOf(false) }
-   val apps = remember { packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).filter { it.activityInfo.packageName != packageName }.sortedBy { it.loadLabel(packageManager).toString().lowercase() } }
-   fun launch(pkg: String) { packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it) } }
-   if (drawer) { Column(Modifier.fillMaxSize().background(bg).padding(16.dp)) {
-     Text("‹  Aplikace", color=Color.White, fontSize=27.sp, modifier=Modifier.clickable { drawer=false }.padding(bottom=16.dp))
-     LazyColumn { items(apps) { app -> Text(app.loadLabel(packageManager).toString(), color=Color.White, fontSize=18.sp, modifier=Modifier.fillMaxWidth().clickable { launch(app.activityInfo.packageName) }.padding(14.dp)) } }
-   } } else Home(onApps={drawer=true}, onLaunch={launch(it)}, apps=apps.map { it.activityInfo.packageName })
-  } } }
+ override fun onCreate(savedInstanceState: Bundle?) {
+  super.onCreate(savedInstanceState)
+  setContent {
+   MaterialTheme(colorScheme=darkColorScheme(background=bg,surface=bg,onSurface=Color.White)) {
+    val prefs = remember { getSharedPreferences("mosaic_usage",Context.MODE_PRIVATE) }
+    var drawer by remember { mutableStateOf(false) }
+    var showFrequent by remember { mutableStateOf(prefs.getBoolean("show_frequent",true)) }
+    var search by remember { mutableStateOf("") }
+    var usageRevision by remember { mutableIntStateOf(0) }
+    val apps = remember {
+     packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0)
+      .filter { it.activityInfo.packageName != packageName }
+      .distinctBy { it.activityInfo.packageName }
+      .sortedBy { it.loadLabel(packageManager).toString().lowercase(Locale.getDefault()) }
+    }
+    fun today(): String = SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date())
+    fun launch(pkg:String) {
+     val intent=packageManager.getLaunchIntentForPackage(pkg) ?: return
+     try {
+      startActivity(intent)
+      val day=today()
+      if(prefs.getString("usage_day","") != day) prefs.edit().clear().putString("usage_day",day).putBoolean("show_frequent",showFrequent).apply()
+      prefs.edit().putInt("count_$pkg",prefs.getInt("count_$pkg",0)+1).apply()
+      usageRevision++
+     } catch (_:Exception) { }
+    }
+    if(drawer) {
+     val day=today()
+     if(prefs.getString("usage_day","") != day) {
+      prefs.edit().clear().putString("usage_day",day).putBoolean("show_frequent",showFrequent).apply()
+     }
+     val revision=usageRevision
+     val popular=remember(revision,day,apps) {
+      apps.filter { prefs.getInt("count_${it.activityInfo.packageName}",0)>0 }
+       .sortedWith(compareByDescending<ResolveInfo> { prefs.getInt("count_${it.activityInfo.packageName}",0) }
+        .thenBy { it.loadLabel(packageManager).toString() }).take(8)
+     }
+     val filtered=apps.filter { it.loadLabel(packageManager).toString().contains(search,ignoreCase=true) }
+     Column(Modifier.fillMaxSize().background(bg).padding(horizontal=12.dp,vertical=20.dp)) {
+      Text("‹  Aplikace",color=Color.White,fontSize=26.sp,modifier=Modifier.clickable { drawer=false }.padding(bottom=12.dp))
+      OutlinedTextField(value=search,onValueChange={search=it},label={Text("Hledat aplikace")},singleLine=true,
+       modifier=Modifier.fillMaxWidth().padding(bottom=10.dp))
+      Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+       Text("Nejčastěji používané dnes",color=Color.White,fontSize=15.sp)
+       Text(if(showFrequent) "Skrýt" else "Zobrazit",color=Color(0xFF8CCBFF),modifier=Modifier.clickable {
+        showFrequent=!showFrequent
+        prefs.edit().putBoolean("show_frequent",showFrequent).apply()
+       })
+      }
+      if(showFrequent && search.isBlank()) {
+       if(popular.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray,fontSize=12.sp,modifier=Modifier.padding(bottom=10.dp))
+       else {
+        Column(Modifier.padding(bottom=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+         popular.chunked(4).forEach { group ->
+          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+           group.forEach { app ->
+            Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch) }
+           }
+           repeat(4-group.size) { Spacer(Modifier.weight(1f)) }
+          }
+         }
+        }
+       }
+      }
+      Text("Všechny aplikace",color=Color.White,fontSize=16.sp,modifier=Modifier.padding(bottom=8.dp))
+      LazyVerticalGrid(columns=GridCells.Fixed(8),horizontalArrangement=Arrangement.spacedBy(3.dp),
+       verticalArrangement=Arrangement.spacedBy(12.dp),modifier=Modifier.fillMaxSize()) {
+       gridItems(filtered,key={it.activityInfo.packageName}) { app -> AppGridItem(app,packageManager,::launch) }
+      }
+     }
+    } else Home(onApps={search="";drawer=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
+      onSelfUninstall={ startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$packageName"))) })
+   }
+  }
+ }
 }
-@Composable private fun Home(onApps:()->Unit,onLaunch:(String)->Unit,apps:List<String>) {
+
+@Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
+ val pkg=app.activityInfo.packageName
+ val icon=remember(pkg) {
+  try {
+   val drawable=app.loadIcon(pm)
+   val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+   drawable.setBounds(0,0,96,96)
+   drawable.draw(Canvas(bitmap))
+   bitmap.asImageBitmap()
+  } catch (_:Exception) { null }
+ }
+ Column(Modifier.fillMaxWidth().clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
+  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
+  else Text("▦",color=Color.White,fontSize=28.sp)
+  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=8.sp,maxLines=2,
+   overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
+ }
+}
+@Composable private fun Home(onApps:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
  val time = remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
  val date = remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
  Column(Modifier.fillMaxSize().background(bg).verticalScroll(rememberScrollState()).padding(horizontal=10.dp, vertical=28.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -69,6 +162,15 @@ class MainActivity : ComponentActivity() {
    Tile("Nastavení", "⚙", Color(0xFF353945), Color(0xFF545A6B), Modifier.weight(1f).height(112.dp), appPackage="com.android.settings") { onLaunch("com.android.settings") }
   }
   Tile("Hudba", "♫", purple, navy, Modifier.fillMaxWidth().height(118.dp), appPackage="com.google.android.apps.youtube.music") { onLaunch("com.google.android.apps.youtube.music") }
+  @OptIn(ExperimentalFoundationApi::class)
+  Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF283447),RoundedCornerShape(15.dp))
+   .combinedClickable(onClick={},onLongClick=onSelfUninstall).padding(15.dp)) {
+   Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+    Text("▦",fontSize=32.sp,color=Color.White)
+    Column { Text("Mosaic Launcher",color=Color.White,fontSize=16.sp)
+     Text("Podržet pro odinstalaci",color=Color.LightGray,fontSize=11.sp) }
+   }
+  }
  }
 }
 @Composable private fun Tile(label:String, symbol:String, start:Color, end:Color, modifier:Modifier=Modifier, big:Boolean=false, appPackage:String?=null, click:()->Unit) {
