@@ -9,6 +9,12 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -440,6 +446,9 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   }
  }
  val orderedTiles=orderedIds.mapNotNull { id -> tiles.firstOrNull { it.id==id } }
+ val tileBounds=remember { mutableStateMapOf<String,Rect>() }
+ var draggingTile by remember { mutableStateOf<String?>(null) }
+ var dragDelta by remember { mutableStateOf(Offset.Zero) }
  fun moveTile(id:String,delta:Int) {
   val from=orderedIds.indexOf(id)
   if(from<0) return
@@ -497,16 +506,49 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
     val span=sizes[tile.id]?:tile.defaultSpan
     val height=heights[tile.id]?:tile.defaultHeight
     var menu by remember { mutableStateOf(false) }
-    Box {
+    Box(Modifier.onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot() }
+     .graphicsLayer {
+      if(draggingTile==tile.id) {
+       translationX=dragDelta.x
+       translationY=dragDelta.y
+       alpha=0.85f
+       shadowElevation=16.dp.toPx()
+      }
+     }.pointerInput(tile.id) {
+      detectDragGesturesAfterLongPress(
+       onDragStart={ draggingTile=tile.id;dragDelta=Offset.Zero },
+       onDrag={ change,amount ->
+        change.consume()
+        dragDelta+=amount
+       },
+       onDragEnd={
+        val origin=tileBounds[tile.id]
+        if(origin!=null) {
+         val drop=origin.center+dragDelta
+         val target=tileBounds.entries.firstOrNull { (id,rect) ->
+          id!=tile.id && rect.contains(drop)
+         }?.key
+         if(target!=null) {
+          val from=orderedIds.indexOf(tile.id)
+          val to=orderedIds.indexOf(target)
+          if(from>=0 && to>=0) moveTile(tile.id,to-from)
+         }
+        }
+        draggingTile=null;dragDelta=Offset.Zero
+       },
+       onDragCancel={draggingTile=null;dragDelta=Offset.Zero}
+      )
+     }) {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
       Modifier.fillMaxWidth().height(height.dp),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,
-      onLongClick={menu=true}) {
+      onLongClick={}) {
        when(tile.id) {
         "apps" -> onApps()
         "multitask" -> onMultitask()
         else -> tile.appPackage?.let(onLaunch)
        }
       }
+     Text("⋮",color=Color.White,fontSize=18.sp,modifier=Modifier.align(Alignment.TopEnd).clickable { menu=true }.padding(horizontal=9.dp,vertical=3.dp))
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
       DropdownMenuItem(text={Text("Posunout na začátek")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-orderedIds.size);menu=false})
       DropdownMenuItem(text={Text("Posunout o místo zpět")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-1);menu=false})
