@@ -657,6 +657,7 @@ private fun packWithPriority(
    }
   } }
 }
+}
 @OptIn(ExperimentalFoundationApi::class)
 @Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,compact:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
  val glassShape=RoundedCornerShape(if(compact) 16.dp else 20.dp)
