@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity() {
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
  }
 }
+@OptIn(ExperimentalFoundationApi::class)
 @Composable private fun Home(onApps:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
  val time = remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
  val date = remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
@@ -162,7 +163,6 @@ class MainActivity : ComponentActivity() {
    Tile("Nastavení", "⚙", Color(0xFF353945), Color(0xFF545A6B), Modifier.weight(1f).height(112.dp), appPackage="com.android.settings") { onLaunch("com.android.settings") }
   }
   Tile("Hudba", "♫", purple, navy, Modifier.fillMaxWidth().height(118.dp), appPackage="com.google.android.apps.youtube.music") { onLaunch("com.google.android.apps.youtube.music") }
-  @OptIn(ExperimentalFoundationApi::class)
   Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF283447),RoundedCornerShape(15.dp))
    .combinedClickable(onClick={},onLongClick=onSelfUninstall).padding(15.dp)) {
    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
