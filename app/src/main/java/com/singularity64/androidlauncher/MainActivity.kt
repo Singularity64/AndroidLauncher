@@ -459,7 +459,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  } }
  val orderedTiles=orderedIds.mapNotNull { id -> tiles.firstOrNull { it.id==id } }
  val tileBounds=remember { mutableStateMapOf<String,Rect>() }
- val emptyBounds=remember { mutableStateMapOf<Int,Rect>() }
+ val slotBounds=remember { mutableStateMapOf<Int,Rect>() }
  var draggingTile by remember { mutableStateOf<String?>(null) }
  var dragDelta by remember { mutableStateOf(Offset.Zero) }
  var dragOrigin by remember { mutableStateOf<Offset?>(null) }
@@ -541,15 +541,16 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    horizontalArrangement=Arrangement.spacedBy(10.dp),
    verticalArrangement=Arrangement.spacedBy(10.dp)
   ) {
-   gridItems(gridCells,span={ entry -> androidx.compose.foundation.lazy.grid.GridItemSpan(entry.second) }) { entry ->
-    val tile=entry.first
-    if(tile==null) { val emptyIndex=gridCells.takeWhile { it !== entry }.size; Spacer(Modifier.fillMaxWidth().height((maxWidth-50.dp)/4).onGloballyPositioned { emptyBounds[emptyIndex]=it.boundsInRoot() }) } else {
-    val span=entry.second
+   gridItems(gridCells.withIndex().toList(),span={ entry -> androidx.compose.foundation.lazy.grid.GridItemSpan(entry.value.second) },key={it.index}) { entry ->
+    val slotIndex=entry.index
+    val tile=entry.value.first
+    if(tile==null) { Spacer(Modifier.fillMaxWidth().height((maxWidth-50.dp)/4).onGloballyPositioned { slotBounds[slotIndex]=it.boundsInRoot() }) } else {
+    val span=entry.value.second
     val height=(heights[tile.id]?:tile.defaultHeight).coerceAtLeast(if(hideLabels) 82 else 108)
     val smallSide=(maxWidth-20.dp-30.dp)/4
     val tileHeight=when(span) { 1 -> smallSide; 2 -> smallSide*2+10.dp; else -> height.dp }
     var menu by remember { mutableStateOf(false) }
-    Box(Modifier.onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot() }
+    Box(Modifier.onGloballyPositioned { tileBounds[tile.id]=it.boundsInRoot();slotBounds[slotIndex]=it.boundsInRoot() }
      .graphicsLayer {
       if(draggingTile==tile.id) {
        translationX=dragDelta.x
@@ -570,19 +571,25 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
         if(origin!=null && dragDelta.getDistance() >= 12.dp.toPx()) {
          // Use the ORIGINAL tile position. Its live bounds can move with graphicsLayer.
          val drop=origin+dragDelta
-         // Use the dragged tile's LEFT edge, not its centre, for multi-cell tiles.
-         val source=tileBounds[tile.id]
-         val left=(source?.left?:origin.x)+dragDelta.x
-         val top=(source?.top?:origin.y)+dragDelta.y
-         val otherRects=tileBounds.filterKeys { it!=tile.id }
-         val anchors=otherRects.values.map { it.left }.plus(emptyBounds.values.map { it.left })
-         val gridLeft=anchors.minOrNull()?:left
+         // Calculate the destination from measured grid slots, never from guessed row heights.
+         val width=span.coerceIn(1,4)
+         val original=tileBounds[tile.id]
+         val dropCenter=origin+dragDelta
          val density=context.resources.displayMetrics.density
          val unit=((maxWidth-50.dp)/4).value*density+10.dp.value*density
-         val width=span.coerceIn(1,4)
-         val col=kotlin.math.round((left-gridLeft)/unit).toInt().coerceIn(0,4-width)
-         val rowAnchors=(otherRects.values.map { it.top }+emptyBounds.values.map { it.top }).distinct().sorted()
-         val row=if(rowAnchors.isEmpty()) 0 else rowAnchors.indices.minByOrNull { kotlin.math.abs(rowAnchors[it]-top) }?:0
+         val gridLeft=slotBounds.values.minOfOrNull { it.left }?:original?.left?:0f
+         val desiredLeft=dropCenter.x-(original?.width?:unit*width)/2f
+         val col=kotlin.math.round((desiredLeft-gridLeft)/unit).toInt().coerceIn(0,4-width)
+         var cursor=0
+         val rows=mutableMapOf<Int,MutableList<Float>>()
+         gridCells.forEachIndexed { index,cell ->
+          val row=cursor/4
+          slotBounds[index]?.let { rows.getOrPut(row) { mutableListOf() }.add(it.top) }
+          cursor+=cell.second
+         }
+         val rowTops=rows.mapValues { (_,values) -> values.minOrNull()?:0f }
+         val targetY=dropCenter.y-(original?.height?:unit)/2f
+         val row=if(rowTops.isEmpty()) 0 else rowTops.minByOrNull { kotlin.math.abs(it.value-targetY) }!!.key
          val destination=row*4+col
          // Resolve all collisions using the complete spans, including previously unpositioned tiles.
          val newPositions=mutableMapOf<String,Int>()
