@@ -221,8 +221,8 @@ class MainActivity : ComponentActivity() {
        contentPadding=PaddingValues(bottom=20.dp)) {
        if(search.isBlank()) {
         item(key="frequent_glass") {
-         GlassAppSection("Nejčastěji používané aplikace",Color(0xFF6654C0),
-          Color(0xFF151328),showFrequent,{showFrequent=!showFrequent;prefs.edit().putBoolean("show_frequent",showFrequent).apply()}) {
+         GlassAppSection("Nejčastěji používané aplikace",Color(0xFF3FA86C),
+          Color(0xFF10261A),showFrequent,{showFrequent=!showFrequent;prefs.edit().putBoolean("show_frequent",showFrequent).apply()}) {
           if(adaptiveEnabled && !usageAccess(this@MainActivity)) {
            Text("Pro automatické řazení povol přístup k údajům o používání.",color=Color.LightGray,fontSize=12.sp)
            Text("Povolit přístup",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(vertical=8.dp))
