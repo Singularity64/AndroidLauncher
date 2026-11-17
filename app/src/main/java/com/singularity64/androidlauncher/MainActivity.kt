@@ -420,7 +420,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val id:String,val label:String,val symbol:String,val start:Color,val end:Color,
  val defaultSpan:Int,val defaultHeight:Int,val appPackage:String?=null,val big:Boolean=false
 )
-@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 private fun packWithPriority(
  first:String,positions:Map<String,Int>,tiles:List<HomeTileSpec>,
  dimensions:(HomeTileSpec)->Pair<Int,Int>
@@ -440,6 +440,7 @@ private fun packWithPriority(
  val rowMap=rows.withIndex().associate { it.value to it.index }
  return result.mapValues { (_,p) -> rowMap.getValue(p/4)*4+p%4 }
 }
+@OptIn(ExperimentalFoundationApi::class)
 @Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,homeRevision:Int,hideLabels:Boolean,onSelfUninstall:()->Unit) {
  val context=LocalContext.current
  val prefs=remember { context.getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
