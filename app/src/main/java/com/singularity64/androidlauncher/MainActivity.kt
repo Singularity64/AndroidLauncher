@@ -690,7 +690,7 @@ private fun packWithPriority(
     }
    }.pointerInput(screenHeightPx) {
     detectVerticalDragGestures(
-     onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f;swipeStartedAt=android.os.SystemClock.uptimeMillis() },
+     onDragStart={ offset -> gestureStartNearBottom=offset.y in (screenHeightPx-150.dp.toPx())..(screenHeightPx-60.dp.toPx());swipeDistance=0f;swipeStartedAt=android.os.SystemClock.uptimeMillis() },
      onVerticalDrag={ change,amount -> if(gestureStartNearBottom && draggingTile==null) { swipeDistance+=amount;change.consume() } },
      onDragEnd={ if(gestureStartNearBottom && swipeDistance < -160.dp.toPx() && android.os.SystemClock.uptimeMillis()-swipeStartedAt>=450L) onMultitask();gestureStartNearBottom=false },
      onDragCancel={ gestureStartNearBottom=false }
