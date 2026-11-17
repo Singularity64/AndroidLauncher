@@ -300,68 +300,111 @@ class MainActivity : ComponentActivity() {
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
  }
 }
+private data class HomeTileSpec(
+ val id:String,val label:String,val symbol:String,val start:Color,val end:Color,
+ val defaultSpan:Int,val defaultHeight:Int,val appPackage:String?=null,val big:Boolean=false
+)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
- val time = remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
- val date = remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
+ val context=LocalContext.current
+ val prefs=remember { context.getSharedPreferences("mosaic_tiles",Context.MODE_PRIVATE) }
+ val time=remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
+ val date=remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
+ val tiles=remember(time,date) { listOf(
+  HomeTileSpec("clock","$time\n$date","◷",navy,purple,2,145,big=true),
+  HomeTileSpec("mail","Pošta","✉",blue,Color(0xFF028AD6),2,145,"com.google.android.gm"),
+  HomeTileSpec("weather","Počasí","☁",Color(0xFF244D81),blue,2,115),
+  HomeTileSpec("calendar","Kalendář","▦",purple,Color(0xFF7037A0),1,115,"com.google.android.calendar"),
+  HomeTileSpec("gallery","Galerie","▧",green,Color(0xFF39A927),1,115,"com.google.android.apps.photos"),
+  HomeTileSpec("apps","Aplikace","▦",navy,Color(0xFF00B9DC),2,116),
+  HomeTileSpec("youtube","YouTube","▶",red,Color(0xFFED3038),2,116,"com.google.android.youtube"),
+  HomeTileSpec("phone","Telefon","☎",green,Color(0xFF42B91D),1,72,"com.google.android.dialer"),
+  HomeTileSpec("messages","Zprávy","▣",blue,navy,1,72,"com.google.android.apps.messaging"),
+  HomeTileSpec("chrome","Chrome","◉",Color(0xFF1648A2),blue,1,72,"com.android.chrome"),
+  HomeTileSpec("settings","Nastavení","⚙",Color(0xFF353945),Color(0xFF545A6B),1,72,"com.android.settings"),
+  HomeTileSpec("multitask","Multitasking","▤",Color(0xFF273B52),Color(0xFF38617B),4,94),
+  HomeTileSpec("music","Hudba","♫",purple,navy,4,118,"com.google.android.apps.youtube.music")
+ ) }
+ val sizes=remember { mutableStateMapOf<String,Int>().apply {
+  tiles.forEach { put(it.id,prefs.getInt("span_"+it.id,it.defaultSpan).coerceIn(1,4)) }
+ } }
+ val heights=remember { mutableStateMapOf<String,Int>().apply {
+  tiles.forEach { put(it.id,prefs.getInt("height_"+it.id,it.defaultHeight)) }
+ } }
  var gestureStartNearBottom by remember { mutableStateOf(false) }
  var swipeDistance by remember { mutableFloatStateOf(0f) }
  BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
-  val screenHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
-  Column(Modifier.fillMaxSize().pointerInput(screenHeightPx) {
-   detectVerticalDragGestures(onDragStart={ offset -> gestureStartNearBottom=offset.y >= screenHeightPx-110.dp.toPx(); swipeDistance=0f },
-    onVerticalDrag={ change,dragAmount -> if(gestureStartNearBottom) { swipeDistance+=dragAmount; change.consume() } },
-    onDragEnd={ if(gestureStartNearBottom && swipeDistance < -75.dp.toPx()) onMultitask(); gestureStartNearBottom=false },
-    onDragCancel={ gestureStartNearBottom=false })
-  }.verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding().padding(horizontal=10.dp, vertical=12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
-  Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("$time\n$date", "◷", navy, purple, Modifier.weight(1f).height(145.dp), big=true) {}
-   Tile("Pošta", "✉", blue, Color(0xFF028AD6), Modifier.weight(1f).height(145.dp), appPackage="com.google.android.gm") { onLaunch("com.google.android.gm") }
-  }
-  Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("Počasí", "☁", Color(0xFF244D81), blue, Modifier.weight(2f).height(115.dp)) {}
-   Tile("Kalendář", "▦", purple, Color(0xFF7037A0), Modifier.weight(1f).height(115.dp), appPackage="com.google.android.calendar") { onLaunch("com.google.android.calendar") }
-   Tile("Galerie", "▧", green, Color(0xFF39A927), Modifier.weight(1f).height(115.dp), appPackage="com.google.android.apps.photos") { onLaunch("com.google.android.apps.photos") }
-  }
-  Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("Aplikace", "▦", navy, Color(0xFF00B9DC), Modifier.weight(1f).height(116.dp), click=onApps)
-   Tile("YouTube", "▶", red, Color(0xFFED3038), Modifier.weight(1f).height(116.dp), appPackage="com.google.android.youtube") { onLaunch("com.google.android.youtube") }
-  }
-  Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("Telefon", "☎", green, Color(0xFF42B91D), Modifier.weight(1f).height(112.dp), appPackage="com.google.android.dialer") { onLaunch("com.google.android.dialer") }
-   Tile("Zprávy", "▣", blue, navy, Modifier.weight(1f).height(112.dp), appPackage="com.google.android.apps.messaging") { onLaunch("com.google.android.apps.messaging") }
-   Tile("Chrome", "◉", Color(0xFF1648A2), blue, Modifier.weight(1f).height(112.dp), appPackage="com.android.chrome") { onLaunch("com.android.chrome") }
-   Tile("Nastavení", "⚙", Color(0xFF353945), Color(0xFF545A6B), Modifier.weight(1f).height(112.dp), appPackage="com.android.settings") { onLaunch("com.android.settings") }
-  }
-  Tile("Multitasking", "▤", Color(0xFF273B52), Color(0xFF38617B), Modifier.fillMaxWidth().height(94.dp), click=onMultitask)
-  Tile("Hudba", "♫", purple, navy, Modifier.fillMaxWidth().height(118.dp), appPackage="com.google.android.apps.youtube.music") { onLaunch("com.google.android.apps.youtube.music") }
-  Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF283447),RoundedCornerShape(15.dp))
-   .combinedClickable(onClick={},onLongClick=onSelfUninstall).padding(15.dp)) {
-   Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-    Text("▦",fontSize=32.sp,color=Color.White)
-    Column { Text("Mosaic Launcher",color=Color.White,fontSize=16.sp)
-     Text("Podržet pro odinstalaci",color=Color.LightGray,fontSize=11.sp) }
+  val screenHeightPx=with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
+  LazyVerticalGrid(
+   columns=GridCells.Fixed(4),
+   modifier=Modifier.fillMaxSize().pointerInput(screenHeightPx) {
+    detectVerticalDragGestures(
+     onDragStart={ offset -> gestureStartNearBottom=offset.y>=screenHeightPx-110.dp.toPx();swipeDistance=0f },
+     onVerticalDrag={ change,amount -> if(gestureStartNearBottom) { swipeDistance+=amount;change.consume() } },
+     onDragEnd={ if(gestureStartNearBottom && swipeDistance < -75.dp.toPx()) onMultitask();gestureStartNearBottom=false },
+     onDragCancel={ gestureStartNearBottom=false }
+    )
+   }.statusBarsPadding().navigationBarsPadding().padding(horizontal=10.dp,vertical=12.dp),
+   horizontalArrangement=Arrangement.spacedBy(10.dp),
+   verticalArrangement=Arrangement.spacedBy(10.dp)
+  ) {
+   gridItems(tiles,span={ tile -> androidx.compose.foundation.lazy.grid.GridItemSpan(sizes[tile.id]?:tile.defaultSpan) },key={it.id}) { tile ->
+    val span=sizes[tile.id]?:tile.defaultSpan
+    val height=heights[tile.id]?:tile.defaultHeight
+    var menu by remember { mutableStateOf(false) }
+    Box {
+     Tile(tile.label,tile.symbol,tile.start,tile.end,
+      Modifier.fillMaxWidth().height(height.dp),big=tile.big,appPackage=tile.appPackage,
+      onLongClick={menu=true}) {
+       when(tile.id) {
+        "apps" -> onApps()
+        "multitask" -> onMultitask()
+        else -> tile.appPackage?.let(onLaunch)
+       }
+      }
+     DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+      listOf(1 to "Malá (1/4)",2 to "Střední (1/2)",4 to "Velká (celá šířka)").forEach { (newSpan,title) ->
+       DropdownMenuItem(text={Text(title)},onClick={
+        sizes[tile.id]=newSpan
+        val newHeight=when(newSpan) { 1 -> 72; 2 -> tile.defaultHeight.coerceAtLeast(112); else -> tile.defaultHeight.coerceAtLeast(118) }
+        heights[tile.id]=newHeight
+        prefs.edit().putInt("span_"+tile.id,newSpan).putInt("height_"+tile.id,newHeight).apply()
+        menu=false
+       })
+      }
+     }
+    }
    }
-  }
+   item(span={androidx.compose.foundation.lazy.grid.GridItemSpan(4)}) {
+    Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFF283447),RoundedCornerShape(15.dp))
+     .combinedClickable(onClick={},onLongClick=onSelfUninstall).padding(15.dp)) {
+     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+      Text("▦",fontSize=32.sp,color=Color.White)
+      Column { Text("Mosaic Launcher",color=Color.White,fontSize=16.sp)
+       Text("Podržet pro odinstalaci",color=Color.LightGray,fontSize=11.sp) }
+     }
+    }
+   }
   }
  }
 }
-@Composable private fun Tile(label:String, symbol:String, start:Color, end:Color, modifier:Modifier=Modifier, big:Boolean=false, appPackage:String?=null, click:()->Unit) {
- Box(modifier.background(Brush.linearGradient(listOf(start,end)),RoundedCornerShape(15.dp)).clickable(onClick=click).padding(15.dp)) {
-  if(big) Column(Modifier.align(Alignment.CenterStart)) { Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light); Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp) }
-  else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceBetween) {
-   val context = LocalContext.current
-   val icon = remember(appPackage) {
+@OptIn(ExperimentalFoundationApi::class)
+@Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,onLongClick:()->Unit={},click:()->Unit) {
+ Box(modifier.background(Brush.linearGradient(listOf(start,end)),RoundedCornerShape(15.dp))
+  .combinedClickable(onClick=click,onLongClick=onLongClick).padding(12.dp)) {
+  if(big) Column(Modifier.align(Alignment.CenterStart)) {
+   Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
+   Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
+  } else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceBetween) {
+   val context=LocalContext.current
+   val icon=remember(appPackage) {
     appPackage?.let { pkg ->
-     try {
-      val drawable = context.packageManager.getApplicationIcon(pkg)
-      monochromeIcon(drawable)
-     } catch (_: Exception) { null }
+     try { monochromeIcon(context.packageManager.getApplicationIcon(pkg)) } catch (_:Exception) { null }
     }
    }
-   if (icon != null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(39.dp))
-   else Text(symbol,color=Color.White,fontSize=37.sp)
-   Text(label,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Medium)
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(32.dp))
+   else Text(symbol,color=Color.White,fontSize=29.sp)
+   Text(label,color=Color.White,fontSize=12.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp)
   }
  }
 }
