@@ -370,10 +370,17 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
  }
- if(onPin!=null) DropdownMenu(expanded=pinMenu,onDismissRequest={pinMenu=false}) {
-  DropdownMenuItem(text={Text("Přidat na plochu")},onClick={pinMenu=false;onPin(pkg)})
  }
-}}private data class HomeTileSpec(
+ if(pinMenu && onPin!=null) {
+  AlertDialog(
+   onDismissRequest={pinMenu=false},
+   title={Text(app.loadLabel(pm).toString())},
+   text={Text("Přidat tuto aplikaci na hlavní plochu?")},
+   confirmButton={TextButton(onClick={pinMenu=false;onPin(pkg)}) { Text("Přidat na plochu") }},
+   dismissButton={TextButton(onClick={pinMenu=false}) { Text("Zrušit") }}
+  )
+ }
+}private data class HomeTileSpec(
  val id:String,val label:String,val symbol:String,val start:Color,val end:Color,
  val defaultSpan:Int,val defaultHeight:Int,val appPackage:String?=null,val big:Boolean=false
 )
