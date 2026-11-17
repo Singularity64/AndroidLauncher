@@ -386,7 +386,7 @@ class MainActivity : ComponentActivity() {
        }
        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
         Column(Modifier.weight(1f)) {
-         Text("Zesednout ostatní dlaždice při oznámení",fontSize=14.sp)
+         Text("ADHD notifikace",fontSize=14.sp)
          if(dimOtherTiles) Text("Vybrat aplikace (${priorityApps.size})",color=Color(0xFF8CCBFF),fontSize=12.sp,
           modifier=Modifier.clickable { showLauncherSettings=false;notificationAppSearch="";showNotificationAppPicker=true }.padding(top=5.dp))
         }
