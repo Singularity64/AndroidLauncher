@@ -246,7 +246,7 @@ class MainActivity : ComponentActivity() {
         .thenBy { it.loadLabel(packageManager).toString() })
        .take(6)
      }
-     // System Back is handled by BackHandler. Also allow a home swipe inside quick switch.
+     // Observe home and back gestures without relying on the system to deliver them.
      val quickSwitchDensity=androidx.compose.ui.platform.LocalDensity.current
      val quickSwitchHomeSwipe=Modifier.pointerInput(Unit) {
       awaitEachGesture {
@@ -263,10 +263,14 @@ class MainActivity : ComponentActivity() {
          if(!pointer.pressed) released=true
         }
        }
-       val distance=with(quickSwitchDensity) { 90.dp.toPx() }
-       val bottomZone=with(quickSwitchDensity) { 110.dp.toPx() }
-       if(start.y>=size.height-bottomZone && start.y-last.y>distance &&
-        kotlin.math.abs(start.x-last.x)<(start.y-last.y)) multitask=false
+       val dx=last.x-start.x
+       val dy=last.y-start.y
+       val swipe=with(quickSwitchDensity) { 65.dp.toPx() }
+       val sideZone=with(quickSwitchDensity) { 45.dp.toPx() }
+       val homeSwipe=dy < -swipe && kotlin.math.abs(dy)>kotlin.math.abs(dx)*1.2f
+       val backSwipe=kotlin.math.abs(dx)>swipe && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.2f &&
+        (start.x<sideZone || start.x>size.width-sideZone)
+       if(homeSwipe || backSwipe) multitask=false
       }
      }
      Column(Modifier.fillMaxSize().then(quickSwitchHomeSwipe).background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
