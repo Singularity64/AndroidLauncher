@@ -411,6 +411,23 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
   HomeTileSpec("pinned_$pkg",label,"▦",Color(0xFF263752),Color(0xFF365879),1,72,pkg)
  }
  }
+ val orderedIds=remember(tiles) {
+  val saved=prefs.getString("tile_order","")!!.split("|").filter { it.isNotBlank() }
+  mutableStateListOf<String>().apply {
+   addAll(saved.filter { id -> tiles.any { it.id==id } })
+   addAll(tiles.map { it.id }.filter { it !in this })
+  }
+ }
+ val orderedTiles=orderedIds.mapNotNull { id -> tiles.firstOrNull { it.id==id } }
+ fun moveTile(id:String,delta:Int) {
+  val from=orderedIds.indexOf(id)
+  if(from<0) return
+  val to=(from+delta).coerceIn(0,orderedIds.lastIndex)
+  if(to==from) return
+  orderedIds.removeAt(from)
+  orderedIds.add(to,id)
+  prefs.edit().putString("tile_order",orderedIds.joinToString("|")).apply()
+ }
  val sizes=remember { mutableStateMapOf<String,Int>().apply {
   tiles.forEach { put(it.id,prefs.getInt("span_"+it.id,it.defaultSpan).coerceIn(1,4)) }
  } }
@@ -455,7 +472,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    horizontalArrangement=Arrangement.spacedBy(10.dp),
    verticalArrangement=Arrangement.spacedBy(10.dp)
   ) {
-   gridItems(tiles,span={ tile -> androidx.compose.foundation.lazy.grid.GridItemSpan(sizes[tile.id]?:tile.defaultSpan) },key={it.id}) { tile ->
+   gridItems(orderedTiles,span={ tile -> androidx.compose.foundation.lazy.grid.GridItemSpan(sizes[tile.id]?:tile.defaultSpan) },key={it.id}) { tile ->
     val span=sizes[tile.id]?:tile.defaultSpan
     val height=heights[tile.id]?:tile.defaultHeight
     var menu by remember { mutableStateOf(false) }
@@ -470,6 +487,12 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
        }
       }
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+      DropdownMenuItem(text={Text("Posunout na začátek")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-orderedIds.size);menu=false})
+      DropdownMenuItem(text={Text("Posunout o místo zpět")},enabled=orderedIds.indexOf(tile.id)>0,onClick={moveTile(tile.id,-1);menu=false})
+      DropdownMenuItem(text={Text("Posunout o místo dál")},enabled=orderedIds.indexOf(tile.id)<orderedIds.lastIndex,onClick={moveTile(tile.id,1);menu=false})
+      DropdownMenuItem(text={Text("Posunout na konec")},enabled=orderedIds.indexOf(tile.id)<orderedIds.lastIndex,onClick={moveTile(tile.id,orderedIds.size);menu=false})
+      HorizontalDivider()
+
       listOf(1 to "Malá (1/4)",2 to "Střední (1/2)",4 to "Velká (celá šířka)").forEach { (newSpan,title) ->
        DropdownMenuItem(text={Text(title)},onClick={
         sizes[tile.id]=newSpan
