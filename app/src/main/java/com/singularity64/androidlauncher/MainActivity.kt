@@ -278,7 +278,7 @@ class MainActivity : ComponentActivity() {
           if(popular.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray,fontSize=12.sp)
           else popular.chunked(4).forEach { rowApps ->
            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch,glass=true) } }
+            rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch,glass=true,onPin=::addToHome) } }
             repeat(4-rowApps.size) { Spacer(Modifier.weight(1f)) }
            }
           }
@@ -292,7 +292,7 @@ class MainActivity : ComponentActivity() {
           {collapsed[category]=collapsed[category]!=true}) {
           groupApps.chunked(5).forEach { rowApps ->
            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)) {
-            rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch,glass=true) } }
+            rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch,glass=true,onPin=::addToHome) } }
             repeat(5-rowApps.size) { Spacer(Modifier.weight(1f)) }
            }
           }
