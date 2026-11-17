@@ -259,7 +259,7 @@ class MainActivity : ComponentActivity() {
        }.padding(bottom=12.dp))
 
       if(ranked.isEmpty()) Column { Text("Za posledních 10 minut nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
-      else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+      else LazyVerticalGrid(columns=GridCells.Fixed(2),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
      }
