@@ -140,6 +140,11 @@ class MainActivity : ComponentActivity() {
     var homeRevision by remember { mutableIntStateOf(0) }
     var hideHomeLabels by remember { mutableStateOf(homePrefs.getBoolean("hide_home_labels",false)) }
     var showLauncherSettings by remember { mutableStateOf(false) }
+    var showNotificationPermission by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+     val enabled=Settings.Secure.getString(contentResolver,"enabled_notification_listeners") ?: ""
+     if(!enabled.contains(packageName)) showNotificationPermission=true
+    }
     fun addToHome(pkg:String) {
      val pinned=homePrefs.getString("pinned_apps","")!!.split("|").filter { it.isNotBlank() }
      val hidden=homePrefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() && it!="pinned_$pkg" }.toSet()
@@ -324,6 +329,13 @@ class MainActivity : ComponentActivity() {
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
       homeRevision=homeRevision,hideLabels=hideHomeLabels,onTileRemoved={homeRevision++})
+    if(showNotificationPermission) AlertDialog(
+     onDismissRequest={showNotificationPermission=false},
+     title={Text("Oznámení na dlaždicích")},
+     text={Text("Pro malé červené tečky u aplikací povol launcheru přístup k oznámením. Obsah oznámení na ploše nezobrazujeme.")},
+     confirmButton={TextButton(onClick={showNotificationPermission=false;startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}) { Text("Povolit") }},
+     dismissButton={TextButton(onClick={showNotificationPermission=false}) { Text("Později") }}
+    )
     if(showLauncherSettings) AlertDialog(
      onDismissRequest={showLauncherSettings=false},
      title={Text("Nastavení launcheru")},
@@ -628,6 +640,9 @@ private fun packWithPriority(
         "multitask" -> onMultitask()
         else -> tile.appPackage?.let(onLaunch)
        }
+      }
+      if(tile.appPackage!=null && LauncherNotificationState.activePackages[tile.appPackage]==true) {
+       Box(Modifier.align(Alignment.TopEnd).padding(9.dp).size(7.dp).background(Color(0xFFFF5252),androidx.compose.foundation.shape.CircleShape))
       }
      
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
