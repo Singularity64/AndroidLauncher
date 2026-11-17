@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
 import android.graphics.Bitmap
@@ -163,7 +165,16 @@ class MainActivity : ComponentActivity() {
 @Composable private fun Home(onApps:()->Unit,onMultitask:()->Unit,onLaunch:(String)->Unit,apps:List<String>,onSelfUninstall:()->Unit) {
  val time = remember { SimpleDateFormat("HH:mm",Locale("cs","CZ")).format(Date()) }
  val date = remember { SimpleDateFormat("EEEE, d. MMMM",Locale("cs","CZ")).format(Date()) }
- Column(Modifier.fillMaxSize().background(bg).verticalScroll(rememberScrollState()).padding(horizontal=10.dp, vertical=28.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
+ var gestureStartNearBottom by remember { mutableStateOf(false) }
+ var swipeDistance by remember { mutableFloatStateOf(0f) }
+ BoxWithConstraints(Modifier.fillMaxSize().background(bg)) {
+  val screenHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { maxHeight.toPx() }
+  Column(Modifier.fillMaxSize().pointerInput(screenHeightPx) {
+   detectVerticalDragGestures(onDragStart={ offset -> gestureStartNearBottom=offset.y >= screenHeightPx-110.dp.toPx(); swipeDistance=0f },
+    onVerticalDrag={ change,dragAmount -> if(gestureStartNearBottom) { swipeDistance+=dragAmount; change.consume() } },
+    onDragEnd={ if(gestureStartNearBottom && swipeDistance < -75.dp.toPx()) onMultitask(); gestureStartNearBottom=false },
+    onDragCancel={ gestureStartNearBottom=false })
+  }.verticalScroll(rememberScrollState()).padding(horizontal=10.dp, vertical=28.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
    Tile("$time\n$date", "◷", navy, purple, Modifier.weight(1f).height(145.dp), big=true) {}
    Tile("Pošta", "✉", blue, Color(0xFF028AD6), Modifier.weight(1f).height(145.dp), appPackage="com.google.android.gm") { onLaunch("com.google.android.gm") }
@@ -192,6 +203,7 @@ class MainActivity : ComponentActivity() {
     Column { Text("Mosaic Launcher",color=Color.White,fontSize=16.sp)
      Text("Podržet pro odinstalaci",color=Color.LightGray,fontSize=11.sp) }
    }
+  }
   }
  }
 }
