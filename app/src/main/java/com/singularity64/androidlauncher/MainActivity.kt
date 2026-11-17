@@ -47,7 +47,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val bg = Color(0xFF10131B)
+private val bg = Color.Black
 private val navy = Color(0xFF263752)
 private val blue = Color(0xFF075AAB)
 private val purple = Color(0xFF543083)
@@ -63,10 +63,7 @@ private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx
   val pixel=pixels[i]
   val alpha=android.graphics.Color.alpha(pixel)
   if(alpha==0) continue
-  val isWhite=android.graphics.Color.red(pixel)>=245 &&
-   android.graphics.Color.green(pixel)>=245 &&
-   android.graphics.Color.blue(pixel)>=245
-  val rgb=if(isWhite) 0xFF9C6BFF.toInt() else android.graphics.Color.WHITE
+  val rgb=android.graphics.Color.WHITE
   pixels[i]=(alpha shl 24) or (rgb and 0x00FFFFFF)
  }
  bitmap.setPixels(pixels,0,bitmap.width,0,0,bitmap.width,bitmap.height)
@@ -101,6 +98,28 @@ private fun adaptiveScores(context:Context,packages:List<String>):Map<String,Dou
   scores[item.packageName]=(scores[item.packageName]?:0.0)+contribution
  }
  return scores
+}
+private fun appGroup(app:ResolveInfo,pm:android.content.pm.PackageManager):String {
+ val pkg=app.activityInfo.packageName.lowercase(Locale.ROOT)
+ val name=app.loadLabel(pm).toString().lowercase(Locale.ROOT)
+ return when {
+  listOf("airbank","air.bank","revolut","george","csas","kbsmart","mbank","moneta","fio","bank","paypal","wise","finance").any { pkg.contains(it) || name.contains(it) } -> "Bankovnictví a finance"
+  listOf("facebook","instagram","messenger","tiktok","snapchat","twitter","reddit","linkedin","threads").any { pkg.contains(it) || name.contains(it) } -> "Sociální sítě"
+  listOf("gmail","outlook","calendar","kalend","docs","sheets","drive","office","word","excel","notion","trello","slack","teams","zoom").any { pkg.contains(it) || name.contains(it) } -> "Práce a produktivita"
+  listOf("youtube","spotify","netflix","music","hudba","video","twitch","disney").any { pkg.contains(it) || name.contains(it) } -> "Zábava a média"
+  listOf("maps","mapy","waze","bolt","uber","wolt","navigation").any { pkg.contains(it) || name.contains(it) } -> "Doprava a mapy"
+  listOf("camera","gallery","photos","foto","galerie").any { pkg.contains(it) || name.contains(it) } -> "Fotografie"
+  listOf("chrome","firefox","browser","opera","edge").any { pkg.contains(it) || name.contains(it) } -> "Internet"
+  else -> when(app.activityInfo.applicationInfo.category) {
+   android.content.pm.ApplicationInfo.CATEGORY_FINANCE -> "Bankovnictví a finance"
+   android.content.pm.ApplicationInfo.CATEGORY_PRODUCTIVITY -> "Práce a produktivita"
+   android.content.pm.ApplicationInfo.CATEGORY_SOCIAL -> "Sociální sítě"
+   android.content.pm.ApplicationInfo.CATEGORY_VIDEO,android.content.pm.ApplicationInfo.CATEGORY_AUDIO -> "Zábava a média"
+   android.content.pm.ApplicationInfo.CATEGORY_MAPS -> "Doprava a mapy"
+   android.content.pm.ApplicationInfo.CATEGORY_GAME -> "Hry"
+   else -> "Ostatní aplikace"
+  }
+ }
 }
 class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
@@ -177,7 +196,7 @@ class MainActivity : ComponentActivity() {
       OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
        leadingIcon={Icon(Icons.Default.Search,contentDescription=null)},
        trailingIcon={if(search.isNotEmpty()) IconButton(onClick={search=""}) { Icon(Icons.Default.Close,contentDescription="Vymazat") }},
-       shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF283447),unfocusedContainerColor=Color(0xFF222C3B),focusedBorderColor=Color(0xFF6B94C4),unfocusedBorderColor=Color.Transparent),
+       shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color(0xFF181818),unfocusedContainerColor=Color(0xFF181818),focusedBorderColor=Color.White,unfocusedBorderColor=Color.Transparent),
        modifier=Modifier.fillMaxWidth().padding(horizontal=4.dp).padding(bottom=14.dp))
       Row(Modifier.fillMaxWidth().padding(bottom=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
        Text(if(adaptiveEnabled && scores.isNotEmpty()) "Chytrý výběr pro dnešek" else "Nejčastěji používané dnes",color=Color.White,fontSize=15.sp)
@@ -211,10 +230,32 @@ class MainActivity : ComponentActivity() {
         }
        }
       }
-      Text("Všechny aplikace",color=Color.White,fontSize=16.sp,modifier=Modifier.padding(bottom=8.dp))
-      LazyVerticalGrid(columns=GridCells.Fixed(5),horizontalArrangement=Arrangement.spacedBy(3.dp),
-       verticalArrangement=Arrangement.spacedBy(9.dp),modifier=Modifier.fillMaxSize()) {
-       gridItems(filtered,key={it.activityInfo.packageName}) { app -> AppGridItem(app,packageManager,::launch) }
+      val rankedApps=filtered.sortedWith(compareByDescending<ResolveInfo> {
+       (scores[it.activityInfo.packageName]?:0.0)+ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5
+      }.thenBy { it.loadLabel(packageManager).toString() })
+      val grouped=rankedApps.groupBy { appGroup(it,packageManager) }.toList()
+       .sortedWith(compareByDescending<Pair<String,List<ResolveInfo>>> { group ->
+        group.second.sumOf { (scores[it.activityInfo.packageName]?:0.0)+ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
+       }.thenBy { it.first })
+      val collapsed=remember { mutableStateMapOf<String,Boolean>() }
+      LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+       grouped.forEach { (category,groupApps) ->
+        item(key="heading_$category") {
+         Row(Modifier.fillMaxWidth().clickable { collapsed[category]=collapsed[category]!=true }.padding(vertical=8.dp),
+          horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+          Text(category,color=Color.White,fontSize=17.sp,fontWeight=FontWeight.SemiBold)
+          Text(if(collapsed[category]==true) "⌄" else "⌃",color=Color.White,fontSize=20.sp)
+         }
+        }
+        if(collapsed[category]!=true) {
+         items(groupApps.chunked(5)) { rowApps ->
+          Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)) {
+           rowApps.forEach { app -> Box(Modifier.weight(1f)) { AppGridItem(app,packageManager,::launch) } }
+           repeat(5-rowApps.size) { Spacer(Modifier.weight(1f)) }
+          }
+         }
+        }
+       }
       }
      }
     } else Home(onApps={search="";drawer=true},onMultitask={multitask=true},onLaunch={launch(it)},apps=apps.map { it.activityInfo.packageName },
@@ -232,12 +273,12 @@ class MainActivity : ComponentActivity() {
    monochromeIcon(drawable)
   } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().background(Color(0xFF263448),RoundedCornerShape(16.dp)).clickable { onLaunch(pkg) }.padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+ Column(Modifier.fillMaxWidth().background(Color.Black,RoundedCornerShape(16.dp)).clickable { onLaunch(pkg) }.padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally) {
   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
    if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(20.dp))
    Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
   }
-  Box(Modifier.fillMaxWidth().padding(top=7.dp).aspectRatio(0.72f).background(Color(0xFF17212E),RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
+  Box(Modifier.fillMaxWidth().padding(top=7.dp).aspectRatio(0.72f).background(Color.Black,RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
    if(icon!=null) Image(bitmap=icon,contentDescription=app.loadLabel(pm).toString(),modifier=Modifier.size(58.dp))
    else Text("▦",color=Color.White,fontSize=48.sp)
   }
@@ -251,7 +292,7 @@ class MainActivity : ComponentActivity() {
    monochromeIcon(drawable)
   } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.background(Color(0xFF202A39),RoundedCornerShape(15.dp)).padding(horizontal=4.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
+ Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.background(Color.Black,RoundedCornerShape(15.dp)).padding(horizontal=4.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
