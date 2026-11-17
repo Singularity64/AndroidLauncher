@@ -57,6 +57,19 @@ private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx
  val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
  drawable.setBounds(0,0,96,96)
  drawable.draw(Canvas(bitmap))
+ val pixels=IntArray(bitmap.width*bitmap.height)
+ bitmap.getPixels(pixels,0,bitmap.width,0,0,bitmap.width,bitmap.height)
+ for(i in pixels.indices) {
+  val pixel=pixels[i]
+  val alpha=android.graphics.Color.alpha(pixel)
+  if(alpha==0) continue
+  val isWhite=android.graphics.Color.red(pixel)>=245 &&
+   android.graphics.Color.green(pixel)>=245 &&
+   android.graphics.Color.blue(pixel)>=245
+  val rgb=if(isWhite) 0xFF9C6BFF.toInt() else android.graphics.Color.WHITE
+  pixels[i]=(alpha shl 24) or (rgb and 0x00FFFFFF)
+ }
+ bitmap.setPixels(pixels,0,bitmap.width,0,0,bitmap.width,bitmap.height)
  return bitmap.asImageBitmap()
 }
 
