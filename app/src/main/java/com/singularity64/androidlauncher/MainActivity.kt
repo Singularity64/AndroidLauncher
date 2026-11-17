@@ -20,9 +20,6 @@ import java.util.Calendar
 import kotlin.math.ln
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
@@ -58,12 +55,8 @@ private val green = Color(0xFF247B26)
 private val red = Color(0xFFAE2034)
 private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx.compose.ui.graphics.ImageBitmap {
  val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
- val source=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
  drawable.setBounds(0,0,96,96)
- drawable.draw(Canvas(source))
- val matrix=ColorMatrix().apply { setSaturation(0f) }
- Canvas(bitmap).drawBitmap(source,0f,0f,Paint(Paint.ANTI_ALIAS_FLAG).apply { colorFilter=ColorMatrixColorFilter(matrix) })
- source.recycle()
+ drawable.draw(Canvas(bitmap))
  return bitmap.asImageBitmap()
 }
 
