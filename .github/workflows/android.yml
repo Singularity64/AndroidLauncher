@@ -1,4 +1,5 @@
 name: Build Android APK
+# Trigger fresh signing-secret build after repository secret setup
 on:
   push:
     branches: [main]
