@@ -1,6 +1,11 @@
 package com.singularity64.androidlauncher
 import android.content.Intent
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.*
@@ -46,29 +51,46 @@ class MainActivity : ComponentActivity() {
  Column(Modifier.fillMaxSize().background(bg).verticalScroll(rememberScrollState()).padding(horizontal=10.dp, vertical=28.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
    Tile("$"+"time\n$"+"date", "◷", navy, purple, Modifier.weight(1f).height(145.dp), big=true) {}
-   Tile("Pošta", "✉", blue, Color(0xFF028AD6), Modifier.weight(1f).height(145.dp)) { onLaunch("com.google.android.gm") }
+   Tile("Pošta", "✉", blue, Color(0xFF028AD6), Modifier.weight(1f).height(145.dp), appPackage="com.google.android.gm") { onLaunch("com.google.android.gm") }
   }
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
    Tile("Počasí", "☁", Color(0xFF244D81), blue, Modifier.weight(2f).height(115.dp)) {}
-   Tile("Kalendář", "▦", purple, Color(0xFF7037A0), Modifier.weight(1f).height(115.dp)) { onLaunch("com.google.android.calendar") }
-   Tile("Galerie", "▧", green, Color(0xFF39A927), Modifier.weight(1f).height(115.dp)) { onLaunch("com.google.android.apps.photos") }
+   Tile("Kalendář", "▦", purple, Color(0xFF7037A0), Modifier.weight(1f).height(115.dp), appPackage="com.google.android.calendar") { onLaunch("com.google.android.calendar") }
+   Tile("Galerie", "▧", green, Color(0xFF39A927), Modifier.weight(1f).height(115.dp), appPackage="com.google.android.apps.photos") { onLaunch("com.google.android.apps.photos") }
   }
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
    Tile("Aplikace", "▦", navy, Color(0xFF00B9DC), Modifier.weight(1f).height(116.dp), click=onApps)
-   Tile("YouTube", "▶", red, Color(0xFFED3038), Modifier.weight(1f).height(116.dp)) { onLaunch("com.google.android.youtube") }
+   Tile("YouTube", "▶", red, Color(0xFFED3038), Modifier.weight(1f).height(116.dp), appPackage="com.google.android.youtube") { onLaunch("com.google.android.youtube") }
   }
   Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-   Tile("Telefon", "☎", green, Color(0xFF42B91D), Modifier.weight(1f).height(112.dp)) { onLaunch("com.google.android.dialer") }
-   Tile("Zprávy", "▣", blue, navy, Modifier.weight(1f).height(112.dp)) { onLaunch("com.google.android.apps.messaging") }
-   Tile("Chrome", "◉", Color(0xFF1648A2), blue, Modifier.weight(1f).height(112.dp)) { onLaunch("com.android.chrome") }
-   Tile("Nastavení", "⚙", Color(0xFF353945), Color(0xFF545A6B), Modifier.weight(1f).height(112.dp)) { onLaunch("com.android.settings") }
+   Tile("Telefon", "☎", green, Color(0xFF42B91D), Modifier.weight(1f).height(112.dp), appPackage="com.google.android.dialer") { onLaunch("com.google.android.dialer") }
+   Tile("Zprávy", "▣", blue, navy, Modifier.weight(1f).height(112.dp), appPackage="com.google.android.apps.messaging") { onLaunch("com.google.android.apps.messaging") }
+   Tile("Chrome", "◉", Color(0xFF1648A2), blue, Modifier.weight(1f).height(112.dp), appPackage="com.android.chrome") { onLaunch("com.android.chrome") }
+   Tile("Nastavení", "⚙", Color(0xFF353945), Color(0xFF545A6B), Modifier.weight(1f).height(112.dp), appPackage="com.android.settings") { onLaunch("com.android.settings") }
   }
-  Tile("Hudba", "♫", purple, navy, Modifier.fillMaxWidth().height(118.dp)) { onLaunch("com.google.android.apps.youtube.music") }
+  Tile("Hudba", "♫", purple, navy, Modifier.fillMaxWidth().height(118.dp), appPackage="com.google.android.apps.youtube.music") { onLaunch("com.google.android.apps.youtube.music") }
  }
 }
-@Composable private fun Tile(label:String, symbol:String, start:Color, end:Color, modifier:Modifier=Modifier, big:Boolean=false, click:()->Unit) {
+@Composable private fun Tile(label:String, symbol:String, start:Color, end:Color, modifier:Modifier=Modifier, big:Boolean=false, appPackage:String?=null, click:()->Unit) {
  Box(modifier.background(Brush.linearGradient(listOf(start,end)),RoundedCornerShape(15.dp)).clickable(onClick=click).padding(15.dp)) {
   if(big) Column(Modifier.align(Alignment.CenterStart)) { Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light); Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp) }
-  else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceBetween) { Text(symbol,color=Color.White,fontSize=37.sp); Text(label,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Medium) }
+  else Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.SpaceBetween) {
+   val context = LocalContext.current
+   val icon = remember(appPackage) {
+    appPackage?.let { pkg ->
+     try {
+      val drawable = context.packageManager.getApplicationIcon(pkg)
+      val bitmap = Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888)
+      val canvas = Canvas(bitmap)
+      drawable.setBounds(0,0,96,96)
+      drawable.draw(canvas)
+      bitmap.asImageBitmap()
+     } catch (_: Exception) { null }
+    }
+   }
+   if (icon != null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(39.dp))
+   else Text(symbol,color=Color.White,fontSize=37.sp)
+   Text(label,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Medium)
+  }
  }
 }
