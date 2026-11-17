@@ -198,7 +198,7 @@ class MainActivity : ComponentActivity() {
        .sortedWith(compareByDescending<ResolveInfo> { (scores[it.activityInfo.packageName]?:0.0) + ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
         .thenBy { it.loadLabel(packageManager).toString() }).take(8)
      }
-     val filtered=apps.filter { it.loadLabel(packageManager).toString().contains(search,ignoreCase=true) }
+     val filtered=apps.filter { it.loadLabel(packageManager).toString().startsWith(search,ignoreCase=true) }
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
       Text("‹  Aplikace",color=Color.White,fontSize=26.sp,modifier=Modifier.clickable { drawer=false }.padding(bottom=12.dp))
       OutlinedTextField(value=search,onValueChange={search=it},placeholder={Text("Hledat aplikace…")},singleLine=true,
