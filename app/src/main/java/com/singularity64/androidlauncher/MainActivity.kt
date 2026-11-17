@@ -206,36 +206,49 @@ class MainActivity : ComponentActivity() {
      val revision=usageRevision
      val access=accessRevision
      val ranked=remember(revision,access,apps) {
-      val usage=mutableMapOf<String,Long>()
+      val recentDuration=mutableMapOf<String,Long>()
+      val lastSeen=mutableMapOf<String,Long>()
       if(usageAccess(this@MainActivity)) try {
        val manager=getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-       val from=todayMs-120000L
-       val events=manager.queryEvents(from-3600000L,todayMs)
+       val twoMinutesAgo=todayMs-120000L
+       val tenMinutesAgo=todayMs-600000L
+       val events=manager.queryEvents(tenMinutesAgo-3600000L,todayMs)
        val event=UsageEvents.Event()
        var foreground:String?=null
-       var since=from
+       var since=tenMinutesAgo
+       fun record(pkg:String,until:Long) {
+        if(until>tenMinutesAgo && since<until) {
+         lastSeen[pkg]=maxOf(lastSeen[pkg]?:0L,until)
+         val duration=(until-maxOf(since,twoMinutesAgo)).coerceAtLeast(0L)
+         if(duration>0) recentDuration[pkg]=(recentDuration[pkg]?:0L)+duration
+        }
+       }
        while(events.hasNextEvent()) {
         events.getNextEvent(event)
         val time=event.timeStamp
-        if(event.eventType==UsageEvents.Event.ACTIVITY_RESUMED) {
-         if(time>=from) foreground?.let { usage[it]=(usage[it]?:0L)+(time.coerceAtMost(todayMs)-since).coerceAtLeast(0L) }
-         foreground=event.packageName
-         since=time.coerceAtLeast(from)
-        } else if(event.eventType==UsageEvents.Event.ACTIVITY_PAUSED && foreground==event.packageName) {
-         if(time>=from) foreground?.let { usage[it]=(usage[it]?:0L)+(time.coerceAtMost(todayMs)-since).coerceAtLeast(0L) }
-         foreground=null
+        when(event.eventType) {
+         UsageEvents.Event.ACTIVITY_RESUMED -> {
+          foreground?.let { record(it,time) }
+          foreground=event.packageName
+          since=time
+         }
+         UsageEvents.Event.ACTIVITY_PAUSED -> if(foreground==event.packageName) {
+          record(event.packageName,time)
+          foreground=null
+         }
         }
        }
-       foreground?.let { usage[it]=(usage[it]?:0L)+(todayMs-since).coerceAtLeast(0L) }
-      } catch (_:Exception) { usage.clear() }
-      apps.filter { (usage[it.activityInfo.packageName] ?: 0L)>0L }
-       .sortedWith(compareByDescending<ResolveInfo> { usage[it.activityInfo.packageName] ?: 0L }
+       foreground?.let { record(it,todayMs) }
+      } catch (_:Exception) { recentDuration.clear();lastSeen.clear() }
+      apps.filter { (lastSeen[it.activityInfo.packageName]?:0L)>=todayMs-600000L }
+       .sortedWith(compareByDescending<ResolveInfo> { recentDuration[it.activityInfo.packageName]?:0L }
+        .thenByDescending { lastSeen[it.activityInfo.packageName]?:0L }
         .thenBy { it.loadLabel(packageManager).toString() })
        .take(6)
      }
      Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
-      Text("Nejpoužívanější za poslední 2 minuty",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
+      Text("Nejpoužívanější za 2 minuty · uchování 10 minut",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       val previewEnabled=remember(accessRevision) {
        (Settings.Secure.getString(contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: "")
         .contains("$packageName/.LauncherPreviewService",ignoreCase=true)
@@ -245,7 +258,7 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
        }.padding(bottom=12.dp))
 
-      if(ranked.isEmpty()) Column { Text("Za poslední 2 minuty nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
+      if(ranked.isEmpty()) Column { Text("Za posledních 10 minut nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
       else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
