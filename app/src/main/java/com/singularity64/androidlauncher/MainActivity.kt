@@ -168,7 +168,8 @@ class MainActivity : ComponentActivity() {
    Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
   }
   Box(Modifier.fillMaxWidth().padding(top=7.dp).aspectRatio(0.72f).background(Color(0xFF17212E),RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
-   Text("Náhled\nnedostupný",color=Color(0xFF8493A8),fontSize=10.sp,lineHeight=14.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+   if(icon!=null) Image(bitmap=icon,contentDescription=app.loadLabel(pm).toString(),modifier=Modifier.size(58.dp))
+   else Text("▦",color=Color.White,fontSize=48.sp)
   }
  }
 }
