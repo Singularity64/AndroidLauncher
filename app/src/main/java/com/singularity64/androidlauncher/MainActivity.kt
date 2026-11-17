@@ -566,7 +566,7 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
       )
      }) {
      Tile(tile.label,tile.symbol,tile.start,tile.end,
-      Modifier.fillMaxWidth().height(height.dp),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,
+      Modifier.fillMaxWidth().then(if(span==1) Modifier.aspectRatio(1f) else Modifier.height(height.dp)),big=tile.big,appPackage=tile.appPackage,hideLabel=hideLabels,compact=span==1,
       onLongClick={menu=true}) {
        when(tile.id) {
         "apps" -> onApps()
@@ -608,12 +608,12 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  }
 }
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
+@Composable private fun Tile(label:String,symbol:String,start:Color,end:Color,modifier:Modifier=Modifier,big:Boolean=false,appPackage:String?=null,hideLabel:Boolean=false,compact:Boolean=false,onLongClick:()->Unit={},click:()->Unit) {
  val glassShape=RoundedCornerShape(24.dp)
  Box(modifier
   .background(Brush.linearGradient(listOf(Color(0xFF1C3558).copy(alpha=0.88f),Color(0xFF1C1B38).copy(alpha=0.93f),Color(0xFF272044).copy(alpha=0.88f))),glassShape)
   .border(1.dp,Brush.linearGradient(listOf(Color(0xFFB6DAFF).copy(alpha=0.72f),Color(0xFF7D82C7).copy(alpha=0.48f),Color(0xFFAE80E9).copy(alpha=0.65f))),glassShape)
-  .combinedClickable(onClick=click,onLongClick=onLongClick).padding(12.dp)) {
+  .combinedClickable(onClick=click,onLongClick=onLongClick).padding(if(compact) 5.dp else 12.dp)) {
   if(big && !hideLabel) Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally) {
    Text(label.substringBefore("\n"),color=Color.White,fontSize=42.sp,fontWeight=FontWeight.Light)
    Text(label.substringAfter("\n"),color=Color.White,fontSize=13.sp)
@@ -624,9 +624,9 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
      try { monochromeIcon(context.packageManager.getApplicationIcon(pkg)) } catch (_:Exception) { null }
     }
    }
-   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(36.dp))
-   else Text(symbol,color=Color.White,fontSize=30.sp)
-   if(!hideLabel) { Spacer(Modifier.height(7.dp));Text(label,color=Color.White,fontSize=11.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center) }
+   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(if(compact) 30.dp else 36.dp))
+   else Text(symbol,color=Color.White,fontSize=if(compact) 25.sp else 30.sp)
+   if(!hideLabel) { Spacer(Modifier.height(if(compact) 3.dp else 7.dp));Text(label,color=Color.White,fontSize=if(compact) 10.sp else 11.sp,fontWeight=FontWeight.Medium,maxLines=2,overflow=TextOverflow.Ellipsis,lineHeight=13.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center) }
   }
  }
 }
