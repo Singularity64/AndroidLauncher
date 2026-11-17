@@ -494,13 +494,14 @@ private fun packWithPriority(
  val sizes=remember { mutableStateMapOf<String,Int>().apply {
   tiles.forEach { put(it.id,prefs.getInt("span_"+it.id,it.defaultSpan).coerceIn(1,4)) }
  } }
+ val rowSizes=remember { mutableStateMapOf<String,Int>().apply { tiles.forEach { put(it.id,prefs.getInt("rows_"+it.id,if(it.id=="clock" || it.id=="mail") 2 else 1)) } } }
  val heights=remember { mutableStateMapOf<String,Int>().apply {
   tiles.forEach { put(it.id,prefs.getInt("height_"+it.id,it.defaultHeight)) }
  } }
  // Real two-dimensional grid. Only completely empty rows are removed.
  fun dimensions(tile:HomeTileSpec):Pair<Int,Int> {
   val w=(sizes[tile.id]?:tile.defaultSpan).coerceIn(1,4)
-  return w to if(w==2 && (tile.id=="clock" || tile.id=="mail" || tile.id=="youtube")) 2 else 1
+  return w to if(w==2) (rowSizes[tile.id]?:1).coerceIn(1,2) else 1
  }
  fun pack(preferred:Map<String,Int>):Map<String,Int> {
   val taken=mutableSetOf<Int>()
@@ -632,12 +633,13 @@ private fun packWithPriority(
       DropdownMenuItem(text={Text("Posunout na konec")},enabled=orderedIds.indexOf(tile.id)<orderedIds.lastIndex,onClick={moveTile(tile.id,orderedIds.size);menu=false})
       HorizontalDivider()
 
-      listOf(1 to "Malá (1/4)",2 to "Střední (1/2)",4 to "Velká (celá šířka)").forEach { (newSpan,title) ->
+      listOf(Triple(1,1,"Malá 1 × 1"),Triple(2,1,"Široká 2 × 1"),Triple(2,2,"Velká 2 × 2"),Triple(4,1,"Pruh 4 × 1")).forEach { (newSpan,newRows,title) ->
        DropdownMenuItem(text={Text(title)},onClick={
         sizes[tile.id]=newSpan
+        rowSizes[tile.id]=newRows
         val newHeight=when(newSpan) { 1 -> 108; 2 -> tile.defaultHeight.coerceAtLeast(112); else -> tile.defaultHeight.coerceAtLeast(118) }
         heights[tile.id]=newHeight
-        prefs.edit().putInt("span_"+tile.id,newSpan).putInt("height_"+tile.id,newHeight).apply()
+        prefs.edit().putInt("span_"+tile.id,newSpan).putInt("rows_"+tile.id,newRows).putInt("height_"+tile.id,newHeight).apply()
         menu=false
        })
       }
