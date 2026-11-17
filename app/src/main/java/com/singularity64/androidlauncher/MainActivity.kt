@@ -140,7 +140,7 @@ class MainActivity : ComponentActivity() {
       }
       Text("Všechny aplikace",color=Color.White,fontSize=16.sp,modifier=Modifier.padding(bottom=8.dp))
       LazyVerticalGrid(columns=GridCells.Fixed(5),horizontalArrangement=Arrangement.spacedBy(3.dp),
-       verticalArrangement=Arrangement.spacedBy(12.dp),modifier=Modifier.fillMaxSize()) {
+       verticalArrangement=Arrangement.spacedBy(9.dp),modifier=Modifier.fillMaxSize()) {
        gridItems(filtered,key={it.activityInfo.packageName}) { app -> AppGridItem(app,packageManager,::launch) }
       }
      }
@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity() {
    bitmap.asImageBitmap()
   } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.padding(vertical=7.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
+ Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.background(Color(0xFF202A39),RoundedCornerShape(15.dp)).padding(horizontal=4.dp,vertical=11.dp)).clickable { onLaunch(pkg) },horizontalAlignment=Alignment.CenterHorizontally) {
   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
