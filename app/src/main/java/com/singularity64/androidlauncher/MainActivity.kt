@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za posledních 7 dní",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       if(ranked.isEmpty()) Text("Zatím žádné spuštěné aplikace",color=Color.LightGray)
-      else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+      else LazyVerticalGrid(columns=GridCells.Fixed(1),verticalArrangement=Arrangement.spacedBy(2.dp)) {
        gridItems(ranked,key={it.activityInfo.packageName}) { app -> MultitaskCard(app,packageManager,::launch) }
       }
      }
@@ -254,20 +254,12 @@ class MainActivity : ComponentActivity() {
 @Composable private fun MultitaskCard(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) {
-  try {
-   val drawable=app.loadIcon(pm)
-   monochromeIcon(drawable)
-  } catch (_:Exception) { null }
+  try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null }
  }
- Column(Modifier.fillMaxWidth().background(Color.Black,RoundedCornerShape(16.dp)).clickable { onLaunch(pkg) }.padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-  Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)) {
-   if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(20.dp))
-   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
-  }
-  Box(Modifier.fillMaxWidth().padding(top=7.dp).aspectRatio(0.72f).background(Color.Black,RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center) {
-   if(icon!=null) Image(bitmap=icon,contentDescription=app.loadLabel(pm).toString(),modifier=Modifier.size(58.dp))
-   else Text("▦",color=Color.White,fontSize=48.sp)
-  }
+ Row(Modifier.fillMaxWidth().clickable { onLaunch(pkg) }.padding(vertical=12.dp,horizontal=6.dp),
+  verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(28.dp))
+  Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=14.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
  }
 }
 @Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false) {
