@@ -12,10 +12,9 @@ import android.view.accessibility.AccessibilityEvent
 import java.util.concurrent.Executors
 
 object AppPreviewCache {
- private val images=object:LinkedHashMap<String,Bitmap>(12,0.75f,true) {
-  override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,Bitmap>):Boolean = size>12
- }
- @Synchronized fun put(pkg:String,bitmap:Bitmap) { images[pkg]=bitmap }
+ private val handler=Handler(Looper.getMainLooper())
+ private val images=androidx.compose.runtime.mutableStateMapOf<String,Bitmap>()
+ @Synchronized fun put(pkg:String,bitmap:Bitmap) { handler.post { images[pkg]=bitmap; if(images.size>12) images.remove(images.keys.first()) } }
  @Synchronized fun get(pkg:String):Bitmap? = images[pkg]
 }
 
@@ -30,6 +29,7 @@ class LauncherPreviewService:AccessibilityService() {
      event?.eventType!=AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
   val pkg=event.packageName?.toString() ?: return
   if(pkg==packageName || pkg=="com.android.systemui") return
+  if(currentPackage==pkg && captureTask!=null) return
   currentPackage=pkg
   captureTask?.let(handler::removeCallbacks)
   val task=Runnable {
