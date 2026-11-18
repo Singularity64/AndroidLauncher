@@ -29,13 +29,13 @@ class LauncherPreviewService:AccessibilityService() {
      event?.eventType!=AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
   val pkg=event.packageName?.toString() ?: return
   if(pkg==packageName || pkg=="com.android.systemui") return
-  if(currentPackage==pkg && captureTask!=null) return
+  if(currentPackage==pkg && AppPreviewCache.get(pkg)!=null) return
   currentPackage=pkg
   captureTask?.let(handler::removeCallbacks)
   val task=Runnable {
    if(currentPackage!=pkg || capturing || Build.VERSION.SDK_INT<30) return@Runnable
    capturing=true
-   takeScreenshot(Display.DEFAULT_DISPLAY,executor,object:TakeScreenshotCallback {
+   try { takeScreenshot(Display.DEFAULT_DISPLAY,executor,object:TakeScreenshotCallback {
     override fun onSuccess(result:ScreenshotResult) {
      try {
       val buffer=result.hardwareBuffer
@@ -51,7 +51,7 @@ class LauncherPreviewService:AccessibilityService() {
      } catch (_:Exception) {} finally { capturing=false }
     }
     override fun onFailure(errorCode:Int) { capturing=false }
-   })
+   }) } catch (_:Exception) { capturing=false }
   }
   captureTask=task
   handler.postDelayed(task,650L)
