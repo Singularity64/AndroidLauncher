@@ -277,8 +277,9 @@ class MainActivity : ComponentActivity() {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za 2 minuty · uchování 10 minut",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       val previewEnabled=remember(accessRevision) {
-       (Settings.Secure.getString(contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: "")
-        .contains("$packageName/.LauncherPreviewService",ignoreCase=true)
+       val manager=getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
+       manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        .any { it.resolveInfo.serviceInfo.packageName==packageName && it.resolveInfo.serviceInfo.name.endsWith(".LauncherPreviewService") }
       }
       if(!previewEnabled) Text("Zapnout náhledy aplikací (Přístupnost)",color=Color(0xFF8CCBFF),
        fontSize=13.sp,modifier=Modifier.clickable {
@@ -491,7 +492,7 @@ class MainActivity : ComponentActivity() {
 @Composable private fun MultitaskCard(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit) {
  val pkg=app.activityInfo.packageName
  val icon=remember(pkg) { try { monochromeIcon(app.loadIcon(pm)) } catch (_:Exception) { null } }
- val preview=remember(pkg) { AppPreviewCache.get(pkg) }
+ val preview=AppPreviewCache.get(pkg)
  val shape=RoundedCornerShape(18.dp)
  Column(Modifier.fillMaxWidth().height(142.dp)
   .background(Color(0xFF171B24),shape)
