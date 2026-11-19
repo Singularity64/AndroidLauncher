@@ -277,14 +277,18 @@ class MainActivity : ComponentActivity() {
       Text("‹  Rychlé přepínání",color=Color.White,fontSize=25.sp,modifier=Modifier.clickable { multitask=false }.padding(bottom=8.dp))
       Text("Nejpoužívanější za 2 minuty · uchování 10 minut",color=Color.LightGray,fontSize=14.sp,modifier=Modifier.padding(bottom=16.dp))
       val previewEnabled=remember(accessRevision) {
-       val manager=getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager
-       manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-        .any { it.resolveInfo.serviceInfo.packageName==packageName && it.resolveInfo.serviceInfo.name.endsWith(".LauncherPreviewService") }
-      }
-      if(!previewEnabled) Text("Zapnout náhledy aplikací (Přístupnost)",color=Color(0xFF8CCBFF),
-       fontSize=13.sp,modifier=Modifier.clickable {
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-       }.padding(bottom=12.dp))
+        // Accessibility permission is owned by Android; recheck it on resume.
+        val component=android.content.ComponentName(this@MainActivity,LauncherPreviewService::class.java)
+        val enabled=Settings.Secure.getString(contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+        enabled.split(':').any { android.content.ComponentName.unflattenFromString(it)==component }
+       }
+       if(!previewEnabled) {
+        Text("Náhledy jsou vypnuté v nastavení Androidu",color=Color.LightGray,fontSize=13.sp)
+        Text("Povolit náhledy aplikací (Přístupnost)",color=Color(0xFF8CCBFF),
+         fontSize=13.sp,modifier=Modifier.clickable {
+          startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+         }.padding(bottom=12.dp))
+       }
 
       if(ranked.isEmpty()) Column { Text("Za posledních 10 minut nejsou dostupné žádné používané aplikace.",color=Color.LightGray); if(!usageAccess(this@MainActivity)) Text("Povolit přístup k údajům o používání",color=Color(0xFF8CCBFF),modifier=Modifier.clickable { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }.padding(top=12.dp)) }
       else LazyVerticalGrid(columns=GridCells.Fixed(3),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
