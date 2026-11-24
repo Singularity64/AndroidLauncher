@@ -183,7 +183,7 @@ class MainActivity : ComponentActivity() {
      lifecycleOwner.lifecycle.addObserver(observer)
      onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val apps = remember {
+    val apps = remember(accessRevision) {
      packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0)
       .filter { it.activityInfo.packageName != packageName }
       .distinctBy { it.activityInfo.packageName }
@@ -307,7 +307,12 @@ class MainActivity : ComponentActivity() {
        .sortedWith(compareByDescending<ResolveInfo> { (scores[it.activityInfo.packageName]?:0.0) + ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
         .thenBy { it.loadLabel(packageManager).toString() }).take(8)
      }
-     val filtered=apps.filter { it.loadLabel(packageManager).toString().startsWith(search,ignoreCase=true) }
+     val filtered=apps.filter {
+      val label=it.loadLabel(packageManager).toString()
+      val pkg=it.activityInfo.packageName
+      label.contains(search.trim(),ignoreCase=true) ||
+       (pkg=="com.android.vending" && listOf("Obchod Play","Google Play","Play Store","Obchod Google Play").any { alias -> alias.contains(search.trim(),ignoreCase=true) })
+     }
      Box(Modifier.fillMaxSize()) {
      Column(Modifier.fillMaxSize().background(Color.Transparent).statusBarsPadding().navigationBarsPadding().padding(horizontal=12.dp,vertical=12.dp)) {
       Row(Modifier.fillMaxWidth().padding(bottom=12.dp),verticalAlignment=Alignment.CenterVertically,
