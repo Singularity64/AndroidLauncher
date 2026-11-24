@@ -193,7 +193,8 @@ class MainActivity : ComponentActivity() {
      onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val apps = remember(accessRevision) {
-     packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0)
+     (packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),0) +
+       listOfNotNull(packageManager.getLaunchIntentForPackage("com.android.vending")?.let { packageManager.resolveActivity(it,0) }))
       .filter { it.activityInfo.packageName != packageName }
       .distinctBy { it.activityInfo.packageName }
       .sortedBy { it.loadLabel(packageManager).toString().lowercase(Locale.getDefault()) }
@@ -210,7 +211,7 @@ class MainActivity : ComponentActivity() {
     fun today(): String = SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date())
     fun launch(pkg:String) {
      LauncherNotificationState.markViewed(pkg)
-     val intent=packageManager.getLaunchIntentForPackage(pkg) ?: return
+     val intent=packageManager.getLaunchIntentForPackage(pkg) ?: if(pkg=="com.android.vending") Intent(Intent.ACTION_VIEW,Uri.parse("market://search?q=apps")).setPackage(pkg) else return
      try {
       startActivity(intent)
       val day=today()
@@ -377,6 +378,13 @@ class MainActivity : ComponentActivity() {
       }.thenByDescending { group -> group.second.sumOf { appUsageRank(it) } }.thenBy { it.first })
       LazyColumn(modifier=Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp),
        contentPadding=PaddingValues(bottom=20.dp)) {
+       if(search.isBlank() || listOf("Obchod Play","Google Play","Play Store").any { it.contains(search.trim(),ignoreCase=true) }) {
+        item(key="direct_play_store") {
+         Text("▷  Obchod Play",color=Color.White,fontSize=16.sp,
+          modifier=Modifier.fillMaxWidth().background(Color(0xB817191E),RoundedCornerShape(16.dp))
+           .clickable { launch("com.android.vending") }.padding(16.dp))
+        }
+       }
        if(!smartMode) {
         item(key="alphabetical_apps") {
          val alphabetic=filtered.sortedWith(compareBy<ResolveInfo> {
@@ -578,9 +586,9 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false,glass:Boolean=false,onPin:((String)->Unit)?=null) {
  val pkg=app.activityInfo.packageName
- val icon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(drawerIcons.get(pkg),pkg) {
+ val icon by key(pkg) { produceState<androidx.compose.ui.graphics.ImageBitmap?>(drawerIcons.get(pkg),pkg) {
   if(value==null) value=withContext(Dispatchers.IO) { cachedDrawerIcon(app,pm) }
- }
+ } }
  var pinMenu by remember { mutableStateOf(false) }
  Box {
  Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).combinedClickable(onClick={onLaunch(pkg)},onLongClick={if(onPin!=null) pinMenu=true}),horizontalAlignment=Alignment.CenterHorizontally) {
