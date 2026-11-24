@@ -584,7 +584,8 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  var pinMenu by remember { mutableStateOf(false) }
  Box {
  Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).combinedClickable(onClick={onLaunch(pkg)},onLongClick={if(onPin!=null) pinMenu=true}),horizontalAlignment=Alignment.CenterHorizontally) {
-  if(icon!=null) Image(bitmap=icon,contentDescription=null,modifier=Modifier.size(34.dp))
+  val loadedIcon=icon
+  if(loadedIcon!=null) Image(bitmap=loadedIcon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
   Text(app.loadLabel(pm).toString(),color=Color.White,fontSize=10.sp,maxLines=2,
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
