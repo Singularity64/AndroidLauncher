@@ -28,6 +28,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.combinedClickable
 import android.os.Bundle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.util.LruCache
 import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
@@ -79,6 +82,12 @@ private fun monochromeIcon(drawable:android.graphics.drawable.Drawable):androidx
  return bitmap.asImageBitmap()
 }
 
+private val drawerIcons = LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(256)
+private fun cachedDrawerIcon(app:ResolveInfo,pm:android.content.pm.PackageManager):androidx.compose.ui.graphics.ImageBitmap? {
+ val key=app.activityInfo.packageName
+ drawerIcons.get(key)?.let { return it }
+ return try { monochromeIcon(app.loadIcon(pm)).also { drawerIcons.put(key,it) } } catch (_:Exception) { null }
+}
 private fun usageAccess(context:Context):Boolean {
  val ops=context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
  return ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,Process.myUid(),context.packageName)==AppOpsManager.MODE_ALLOWED
@@ -188,6 +197,15 @@ class MainActivity : ComponentActivity() {
       .filter { it.activityInfo.packageName != packageName }
       .distinctBy { it.activityInfo.packageName }
       .sortedBy { it.loadLabel(packageManager).toString().lowercase(Locale.getDefault()) }
+    }
+    var drawerScores by remember { mutableStateOf<Map<String,Double>>(emptyMap()) }
+    LaunchedEffect(apps,accessRevision,adaptiveEnabled,usageRevision) {
+     drawerScores=withContext(Dispatchers.IO) {
+      if(adaptiveEnabled) adaptiveScores(this@MainActivity,apps.map { it.activityInfo.packageName }) else emptyMap()
+     }
+    }
+    LaunchedEffect(apps) {
+     withContext(Dispatchers.IO) { apps.forEach { cachedDrawerIcon(it,packageManager) } }
     }
     fun today(): String = SimpleDateFormat("yyyy-MM-dd",Locale.US).format(Date())
     fun launch(pkg:String) {
@@ -301,7 +319,7 @@ class MainActivity : ComponentActivity() {
       prefs.edit().apply { prefs.all.keys.filter { it.startsWith("count_") }.forEach { remove(it) }; putString("usage_day",day); putBoolean("show_frequent",showFrequent) }.apply()
      }
      val revision=usageRevision
-     val scores=remember(revision,day,apps,accessRevision,adaptiveEnabled) { if(adaptiveEnabled) adaptiveScores(this@MainActivity,apps.map { it.activityInfo.packageName }) else emptyMap() }
+     val scores=drawerScores
      val popular=remember(revision,day,apps,scores,adaptiveEnabled) {
       apps.filter { (scores[it.activityInfo.packageName]?:0.0)>0.0 || prefs.getInt("count_${it.activityInfo.packageName}",0)>0 }
        .sortedWith(compareByDescending<ResolveInfo> { (scores[it.activityInfo.packageName]?:0.0) + ln(1.0+prefs.getInt("count_${it.activityInfo.packageName}",0))*1.5 }
@@ -560,11 +578,8 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable private fun AppGridItem(app:ResolveInfo,pm:android.content.pm.PackageManager,onLaunch:(String)->Unit,tile:Boolean=false,glass:Boolean=false,onPin:((String)->Unit)?=null) {
  val pkg=app.activityInfo.packageName
- val icon=remember(pkg) {
-  try {
-   val drawable=app.loadIcon(pm)
-   monochromeIcon(drawable)
-  } catch (_:Exception) { null }
+ val icon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(drawerIcons.get(pkg),pkg) {
+  if(value==null) value=withContext(Dispatchers.IO) { cachedDrawerIcon(app,pm) }
  }
  var pinMenu by remember { mutableStateOf(false) }
  Box {
