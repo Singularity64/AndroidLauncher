@@ -589,9 +589,10 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
  val icon by key(pkg) { produceState<androidx.compose.ui.graphics.ImageBitmap?>(drawerIcons.get(pkg),pkg) {
   if(value==null) value=withContext(Dispatchers.IO) { cachedDrawerIcon(app,pm) }
  } }
+ val context=LocalContext.current
  var pinMenu by remember { mutableStateOf(false) }
  Box {
- Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).combinedClickable(onClick={onLaunch(pkg)},onLongClick={if(onPin!=null) pinMenu=true}),horizontalAlignment=Alignment.CenterHorizontally) {
+ Column(Modifier.fillMaxWidth().then(if(tile) Modifier.background(Color(0xFF263448),RoundedCornerShape(16.dp)).padding(vertical=13.dp,horizontal=4.dp) else Modifier.then(if(glass) Modifier else Modifier.background(Color.Black,RoundedCornerShape(15.dp))).padding(horizontal=2.dp,vertical=11.dp)).combinedClickable(onClick={onLaunch(pkg)},onLongClick={pinMenu=true}),horizontalAlignment=Alignment.CenterHorizontally) {
   val loadedIcon=icon
   if(loadedIcon!=null) Image(bitmap=loadedIcon,contentDescription=null,modifier=Modifier.size(34.dp))
   else Text("▦",color=Color.White,fontSize=28.sp)
@@ -599,12 +600,20 @@ private fun glassColors(category:String):Pair<Color,Color> = when(category) {
    overflow=TextOverflow.Ellipsis,lineHeight=10.sp)
  }
  }
- if(pinMenu && onPin!=null) {
+ if(pinMenu) {
   AlertDialog(
    onDismissRequest={pinMenu=false},
    title={Text(app.loadLabel(pm).toString())},
-   text={Text("Přidat tuto aplikaci na hlavní plochu?")},
-   confirmButton={TextButton(onClick={pinMenu=false;onPin(pkg)}) { Text("Přidat na plochu") }},
+   text={Text("Vyber akci pro aplikaci.")},
+   confirmButton={
+    Row {
+     if(onPin!=null) TextButton(onClick={pinMenu=false;onPin(pkg)}) { Text("Přidat na plochu") }
+     if(pkg!=context.packageName) TextButton(onClick={
+      pinMenu=false
+      context.startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:$pkg")))
+     }) { Text("Odinstalovat",color=Color(0xFFFF5252)) }
+    }
+   },
    dismissButton={TextButton(onClick={pinMenu=false}) { Text("Zrušit") }}
   )
  }
@@ -834,6 +843,10 @@ private fun packWithPriority(
       }
      
      DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+      if(tile.appPackage!=null && tile.appPackage!=context.packageName) DropdownMenuItem(text={Text("Odinstalovat aplikaci",color=Color(0xFFFF5252))},onClick={
+       menu=false
+       context.startActivity(Intent(Intent.ACTION_DELETE,Uri.parse("package:${tile.appPackage}")))
+      })
       if(tile.id!="apps") DropdownMenuItem(text={Text("Odebrat z plochy",color=Color(0xFFFF5252))},onClick={
        val hidden=prefs.getString("hidden_tiles","")!!.split("|").filter { it.isNotBlank() }.toMutableSet()
        hidden.add(tile.id)
